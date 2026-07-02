@@ -9,6 +9,7 @@ import type { Request, Response } from 'express';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NombaService } from './nomba.service.js';
 
 /**
  * Nomba webhook handler — mounted at POST /escrow/webhooks/nomba
@@ -31,6 +32,7 @@ export class NombaWebhookController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly nombaService: NombaService,
   ) {}
 
   @Post('nomba')
@@ -153,6 +155,53 @@ export class NombaWebhookController {
         newStatus = 'PARTIAL';
       }
 
+      // ── Handle Overpayment / Excess Refund ─────────────────────────────
+      let refundRef: string | null = null;
+      let refundSuccess = false;
+      let refundReason: string | null = null;
+
+      if (newStatus === 'OVERFUNDED') {
+        const excess = newAmountReceived - total;
+        const senderAccount = data.senderAccount ?? data.originatorAccount ?? '';
+        let senderBank = data.senderBankCode ?? data.originatorBankCode ?? '';
+
+        if (!senderBank) {
+          const rawBankName = data.senderBank ?? data.originatorBank ?? '';
+          if (rawBankName.toLowerCase().includes('wema')) {
+            senderBank = '035';
+          } else if (rawBankName.toLowerCase().includes('gtb')) {
+            senderBank = '058';
+          } else if (rawBankName.toLowerCase().includes('zenith')) {
+            senderBank = '057';
+          }
+        }
+
+        if (senderAccount && senderBank) {
+          try {
+            this.logger.log(
+              `Overpayment detected on agreement ${agreement.id}. Triggering automatic refund of excess: ₦${excess} to Account: ${senderAccount}, Bank: ${senderBank}`,
+            );
+            const refundRes = await this.nombaService.disburse({
+              accountNumber: senderAccount,
+              bankCode: senderBank,
+              amount: excess,
+              narration: `Refund Excess for Vouch Agreement ${agreement.id.substring(0, 8)}`,
+              reference: `RFND-${requestId.substring(0, 8)}-${Date.now()}`,
+              accountName: data.senderName ?? 'Vouch Buyer Refund',
+            });
+            refundRef = refundRes?.data?.transactionReference ?? `RFND-${requestId.substring(0, 8)}`;
+            refundSuccess = true;
+            this.logger.log(`Automatic refund executed successfully. Ref: ${refundRef}`);
+          } catch (err: any) {
+            refundReason = err.message || 'Nomba API disbursement error';
+            this.logger.error(`Automatic refund execution failed: ${refundReason}`);
+          }
+        } else {
+          refundReason = 'Insufficient sender bank details for automatic refund';
+          this.logger.warn(`Cannot trigger automatic refund: ${refundReason}`);
+        }
+      }
+
       await this.prisma.agreement.update({
         where: { id: agreement.id },
         data: {
@@ -183,6 +232,13 @@ export class NombaWebhookController {
             totalExpected: total,
             newStatus,
             senderName: data.senderName ?? null,
+            automaticRefund: newStatus === 'OVERFUNDED' ? {
+              triggered: true,
+              success: refundSuccess,
+              refundRef,
+              reason: refundReason,
+              refundAmount: newAmountReceived - total,
+            } : undefined,
           },
         },
       });

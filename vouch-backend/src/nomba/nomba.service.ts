@@ -60,7 +60,7 @@ export class NombaService {
           accountRef: params.agreementId,           // unique ref — we use the agreementId
           accountName: params.accountName,
           expiryDate: null,                         // no expiry — stays open until funded
-          ...(params.amount ? { amount: params.amount * 100 } : {}), // kobo; optional lock
+          ...(params.amount ? { expectedAmount: params.amount } : {}),
         },
         { headers: await this.headers() },
       );
@@ -68,8 +68,7 @@ export class NombaService {
       return response.data;
     } catch (error: any) {
       this.logger.error(
-        'Failed to create Nomba virtual account',
-        error?.response?.data,
+        `Failed to create Nomba virtual account: ${JSON.stringify(error?.response?.data ?? error.message)}`,
       );
       throw error;
     }
@@ -103,15 +102,17 @@ export class NombaService {
           { headers: await this.headers() },
         );
       } else {
-        // v1 parent transfer
+        // v2 parent bank transfer
         response = await axios.post(
-          `${this.baseUrl}/v1/transfers/single`,
+          `${this.baseUrl}/v2/transfers/bank`,
           {
             amount: params.amount,
+            accountNumber: params.accountNumber,
+            accountName: params.accountName ?? 'Vouch Seller Payout',
+            bankCode: params.bankCode,
+            merchantTxRef: params.reference,
+            senderName: 'Vouch Escrow Payout',
             narration: params.narration,
-            beneficiaryAccount: params.accountNumber,
-            beneficiaryBank: params.bankCode,
-            reference: params.reference,
           },
           { headers: await this.headers() },
         );

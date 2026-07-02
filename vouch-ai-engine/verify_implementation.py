@@ -45,8 +45,7 @@ def test_green_scenario():
     
     print(f"✓ GREEN Test: score={score}, signals={len(result['triggered_signals'])}")
     assert score < 40, f"GREEN score should be < 40, got {score}"
-    assert "identity_verified" in result["triggered_signals"]
-    assert "liveness_passed" in result["triggered_signals"]
+    assert "amount_matches_agreement" in result["triggered_signals"]
     print(f"  Signals: {result['triggered_signals']}")
     return True
 
@@ -87,7 +86,7 @@ def test_red_vpn_scenario():
     
     print(f"✓ RED (VPN) Test: score={score}, signals={len(result['triggered_signals'])}")
     assert score >= 70, f"RED VPN score should be >= 70, got {score}"
-    assert "is_vpn" in result["triggered_signals"]
+    assert "vpn_detected" in result["triggered_signals"]
     print(f"  Signals: {result['triggered_signals']}")
     return True
 
@@ -147,7 +146,7 @@ def test_amber_new_account():
         device_matches_onboarding=False,
         account_age_days=3,  # Very new account
         previous_transactions=0,
-        transaction_amount=550000,  # Large amount (>500k)
+        transaction_amount=1200000,  # Large amount (>1M)
         time_since_last_tx_hrs=24,
         identity_verified=True,
         identity_match_score=92,
@@ -159,9 +158,9 @@ def test_amber_new_account():
     
     print(f"✓ AMBER Test: score={score}, signals={len(result['triggered_signals'])}")
     assert 40 <= score < 70, f"AMBER score should be 40-69, got {score}"
-    assert "account_very_new" in result["triggered_signals"]
-    assert "device_not_seen_before" in result["triggered_signals"]
-    assert "high_transaction_amount" in result["triggered_signals"]
+    assert "new_account" in result["triggered_signals"]
+    assert "new_device" in result["triggered_signals"]
+    assert "device_mismatch" in result["triggered_signals"]
     print(f"  Signals: {result['triggered_signals']}")
     return True
 

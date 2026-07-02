@@ -40,6 +40,15 @@ export class EscrowController {
     return this.escrowService.getAgreement(id, developer);
   }
 
+  @Get('agreements/:id/statement')
+  @UseGuards(ApiKeyGuard)
+  async getStatement(
+    @Param('id') id: string,
+    @CurrentDeveloper() developer: Developer,
+  ) {
+    return this.escrowService.getStatement(id, developer);
+  }
+
   @Post('agreements/:id/assess')
   @UseGuards(ApiKeyGuard)
   async assessPaymentRisk(

@@ -207,13 +207,12 @@ class FraudAssessResponse(BaseModel):
     processing_time_ms: float
 
 
-# ====================== ENDPOINT ======================
-@router.post("/assess", response_model=FraudAssessResponse)
-async def assess_fraud(context: FraudAssessRequest):
-    start_time = time.time()
-    
-    try:
-        load_ml_models()  # Lazy load
+# ====================== SCORING ENGINE CLASS ===========================
+class FraudScoringEngine:
+    @staticmethod
+    def calculate_score(context: FraudAssessRequest) -> Dict[str, Any]:
+        """Runs Layer 1 (Rules) & Layer 2 (ML) fraud scoring"""
+        load_ml_models()
         
         # Layer 1: Rules
         rule_score, triggered_signals, has_critical = calculate_rule_score(context.dict())
@@ -221,7 +220,7 @@ async def assess_fraud(context: FraudAssessRequest):
         # Layer 2: LightGBM
         ml_score = get_ml_score(context.dict(), rule_score)
         
-        # Ensemble: ContextBuilder rules have 70% weight, ML model has 30% weight
+        # Ensemble: ContextBuilder rules have 60% weight, ML model has 40% weight
         if ml_score is not None:
             final_score = int(0.60 * rule_score + 0.40 * ml_score)
         else:
@@ -239,19 +238,37 @@ async def assess_fraud(context: FraudAssessRequest):
             flag, category, rec = "AMBER", "Elevated Risk", "require_additional_verification"
         else:
             flag, category, rec = "GREEN", "Low Risk", "proceed"
-        
+            
+        return {
+            "score": final_score,
+            "rule_score": rule_score,
+            "ml_score": ml_score,
+            "flag": flag,
+            "category": category,
+            "triggered_signals": triggered_signals,
+            "recommendation": rec
+        }
+
+
+# ====================== ENDPOINT ======================
+@router.post("/assess", response_model=FraudAssessResponse)
+async def assess_fraud(context: FraudAssessRequest):
+    start_time = time.time()
+    
+    try:
+        res = FraudScoringEngine.calculate_score(context)
         processing_time_ms = round((time.time() - start_time) * 1000, 1)
         
-        logger.info(f"[{context.transaction_id}] Fraud result: {flag} | Rule={rule_score} | ML={ml_score} | Final={final_score}")
+        logger.info(f"[{context.transaction_id}] Fraud result: {res['flag']} | Rule={res['rule_score']} | ML={res['ml_score']} | Final={res['score']}")
         
         return FraudAssessResponse(
-            score=final_score,
-            rule_score=rule_score,
-            ml_score=ml_score,
-            flag=flag,
-            category=category,
-            triggered_signals=triggered_signals,
-            recommendation=rec,
+            score=res["score"],
+            rule_score=res["rule_score"],
+            ml_score=res["ml_score"],
+            flag=res["flag"],
+            category=res["category"],
+            triggered_signals=res["triggered_signals"],
+            recommendation=res["recommendation"],
             processing_time_ms=processing_time_ms
         )
         

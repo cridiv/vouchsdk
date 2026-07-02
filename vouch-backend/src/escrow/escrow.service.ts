@@ -466,6 +466,85 @@ export class EscrowService {
     return agreement;
   }
 
+  async getStatement(agreementId: string, developer: Developer) {
+    this.logger.log(`Generating statement for agreement ${agreementId} for developer ${developer.id}`);
+
+    const agreement = await this.prisma.agreement.findUnique({
+      where: { id: agreementId },
+      include: {
+        milestones: true,
+        nombaTransfers: true,
+      },
+    });
+
+    if (!agreement) {
+      throw new NotFoundException(`Agreement with ID ${agreementId} not found`);
+    }
+
+    if (agreement.developerId !== developer.id) {
+      throw new ForbiddenException(`You do not have permission to access this agreement`);
+    }
+
+    // Fetch related developer logs to extract audit info and refunds
+    const logs = await this.prisma.developerLog.findMany({
+      where: {
+        agreementId,
+        developerId: developer.id,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Extract refunds (both successful and failed flags) from logs
+    const refunds = logs
+      .filter((log) => log.eventType === 'OVERPAYMENT_FLAGGED' && log.payload && (log.payload as any).automaticRefund)
+      .map((log) => {
+        const refundInfo = (log.payload as any).automaticRefund;
+        return {
+          success: refundInfo.success,
+          amount: refundInfo.refundAmount,
+          reference: refundInfo.refundRef,
+          reason: refundInfo.reason,
+          timestamp: log.createdAt,
+        };
+      });
+
+    const shortfall = Math.max(0, agreement.totalAmount - (agreement.amountReceived ?? 0));
+    const overpayment = Math.max(0, (agreement.amountReceived ?? 0) - agreement.totalAmount);
+
+    return {
+      agreementId: agreement.id,
+      status: agreement.status,
+      totalExpected: agreement.totalAmount,
+      amountReceived: agreement.amountReceived,
+      shortfall,
+      overpayment,
+      currency: agreement.currency,
+      createdAt: agreement.createdAt,
+      transfers: agreement.nombaTransfers.map((t) => ({
+        id: t.id,
+        amount: t.amount,
+        reference: t.nombaReference,
+        senderName: t.senderName,
+        senderBank: t.senderBank,
+        timestamp: t.createdAt,
+      })),
+      milestones: agreement.milestones.map((m) => ({
+        id: m.id,
+        title: m.title,
+        amount: m.amount,
+        status: m.status,
+        nombaTransactionId: m.nombaTransactionId,
+        disbursedAt: m.disbursedAt,
+      })),
+      refunds,
+      auditLogs: logs.map((l) => ({
+        timestamp: l.createdAt,
+        eventType: l.eventType,
+        payload: l.payload,
+      })),
+    };
+  }
+
   /**
    * DEV/TEST ONLY: Simulate a Squad webhook payment confirmation.
    * Directly transitions the agreement from PENDING to FUNDED without calling Squad.
