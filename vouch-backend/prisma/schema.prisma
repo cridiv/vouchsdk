@@ -45,7 +45,6 @@ model PlatformUser {
   createdAt                     DateTime @default(now())
 
   fraudAssessments FraudAssessment[]
-  squadSignals     SquadSignal[]
 
   @@unique([externalUserId, developerId]) // same external ID can exist across different developers
 }
@@ -62,36 +61,37 @@ model ApiKey {
 }
 
 model Agreement {
-  id                    String       @id @default(uuid())
-  developerId           String
-  developer             Developer    @relation(fields: [developerId], references: [id])
-  buyerExternalId       String       // external ID of the buyer on the client platform
-  sellerExternalId      String       // external ID of the seller on the client platform
-  status                EscrowStatus @default(PENDING)
-  squadVirtualAccountId String?
-  squadVirtualAccountNo String?
-  totalAmount           Float
-  currency              String       @default("NGN")
-  createdAt             DateTime     @default(now())
+  id                     String       @id @default(uuid())
+  developerId            String
+  developer              Developer    @relation(fields: [developerId], references: [id])
+  buyerExternalId        String       // external ID of the buyer on the client platform
+  sellerExternalId       String       // external ID of the seller on the client platform
+  status                 EscrowStatus @default(PENDING)
+  nombaVirtualAccountId  String?
+  nombaVirtualAccountNo  String?
+  nombaVirtualAccountRef String?
+  amountReceived         Float        @default(0)
+  totalAmount            Float
+  currency               String       @default("NGN")
+  createdAt              DateTime     @default(now())
 
   milestones       Milestone[]
   fraudAssessments FraudAssessment[]
-  squadSignals     SquadSignal[]
+  nombaTransfers   NombaTransfer[]
 }
 
 model Milestone {
-  id                 String          @id @default(uuid())
-  agreementId        String
-  agreement          Agreement       @relation(fields: [agreementId], references: [id])
-  title              String
-  amount             Float
-  buyerConfirmed     Boolean         @default(false)
-  sellerConfirmed    Boolean         @default(false)
-  squadTransactionId String?
-  squadPaymentLinkId String?
-  status             MilestoneStatus @default(PENDING)
-  disbursedAt        DateTime?
-  createdAt          DateTime        @default(now())
+  id               String          @id @default(uuid())
+  agreementId      String
+  agreement        Agreement       @relation(fields: [agreementId], references: [id])
+  title            String
+  amount           Float
+  buyerConfirmed   Boolean         @default(false)
+  sellerConfirmed  Boolean         @default(false)
+  nombaTransactionId String?
+  status           MilestoneStatus @default(PENDING)
+  disbursedAt      DateTime?
+  createdAt        DateTime        @default(now())
 }
 
 model FraudAssessment {
@@ -108,19 +108,17 @@ model FraudAssessment {
   createdAt        DateTime     @default(now())
 }
 
-model SquadSignal {
-  id                     String       @id @default(uuid())
-  platformUserId         String
-  platformUser           PlatformUser @relation(fields: [platformUserId], references: [id])
-  agreementId            String?
-  agreement              Agreement?   @relation(fields: [agreementId], references: [id])
-  paymentChannel         String?
-  cardBin                String?
-  payerName              String?
-  transactionRef         String?
-  amountMatchesAgreement Boolean?
-  rawWebhookPayload      Json?
-  createdAt              DateTime     @default(now())
+model NombaTransfer {
+  id                String    @id @default(uuid())
+  agreementId       String
+  agreement         Agreement @relation(fields: [agreementId], references: [id])
+  nombaReference    String    @unique
+  amount            Float
+  senderName        String?
+  senderBank        String?
+  senderAccount     String?
+  rawWebhookPayload Json
+  createdAt         DateTime  @default(now())
 }
 
 // Every meaningful backend event is logged here
@@ -140,10 +138,13 @@ model DeveloperLog {
 
 enum EscrowStatus {
   PENDING
+  PARTIAL
   FUNDED
+  OVERFUNDED
   IN_PROGRESS
   COMPLETED
   DISBURSED
+  REFUNDED
   FROZEN
 }
 
@@ -173,4 +174,6 @@ enum LogEvent {
   MILESTONE_CONFIRMED
   DISBURSEMENT_COMPLETED
   DISBURSEMENT_FAILED
+  OVERPAYMENT_FLAGGED
+  RECONCILIATION_MATCHED
 }

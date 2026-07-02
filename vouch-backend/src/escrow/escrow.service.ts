@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { SquadService } from '../squad/squad.service.js';
+import { NombaService } from '../nomba/nomba.service.js';
 import { FraudService } from '../fraud/fraud.service.js';
 import { DeveloperService } from '../developer/developer.service.js';
 import { DeveloperLogService } from '../common/services/developer-log.service.js';
@@ -17,7 +17,7 @@ export class EscrowService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly squadService: SquadService,
+    private readonly nombaService: NombaService,
     private readonly fraudService: FraudService,
     private readonly developerService: DeveloperService,
     private readonly developerLogService: DeveloperLogService,
@@ -67,31 +67,33 @@ export class EscrowService {
       },
     });
 
-    // Thing 4 — Create the Squad Virtual Account
-    const buyerEmail = dto.buyerEmail ?? `${dto.buyerExternalId}@vouch.dev`;
-    const buyerName = dto.buyerName ?? 'Vouch User';
+    // Thing 4 — Create the Nomba Virtual Account
+    const buyerName = dto.buyerName ?? `Vouch-${dto.buyerExternalId.substring(0, 8)}`;
 
-    let virtualAccount;
+    let virtualAccount: any;
     try {
-      virtualAccount = await this.squadService.createVirtualAccount(
-        agreement.id,
-        buyerEmail,
-        buyerName,
-      );
+      virtualAccount = await this.nombaService.createVirtualAccount({
+        accountName: buyerName,
+        agreementId: agreement.id,
+      });
     } catch (err: any) {
-      this.logger.error(`Failed to create Squad virtual account for agreement ${agreement.id}:`, err.message);
+      this.logger.error(`Failed to create Nomba virtual account for agreement ${agreement.id}:`, err.message);
       // Clean up the created agreement & milestones so we don't leave orphaned pending records
       await this.prisma.milestone.deleteMany({ where: { agreementId: agreement.id } });
       await this.prisma.agreement.delete({ where: { id: agreement.id } });
-      throw new BadRequestException(`Squad virtual account creation failed: ${err.message}`);
+      throw new BadRequestException(`Nomba virtual account creation failed: ${err.message}`);
     }
+
+    // Nomba returns data nested under response.data
+    const vaData = virtualAccount?.data ?? virtualAccount;
 
     // Update the Agreement with virtual account details
     const updatedAgreement = await this.prisma.agreement.update({
       where: { id: agreement.id },
       data: {
-        squadVirtualAccountId: virtualAccount.customer_identifier || agreement.id,
-        squadVirtualAccountNo: virtualAccount.virtual_account_number,
+        nombaVirtualAccountId: vaData?.accountHolderId ?? agreement.id,
+        nombaVirtualAccountNo: vaData?.bankAccountNumber,
+        nombaVirtualAccountRef: vaData?.accountRef,
       },
       include: {
         milestones: true,
@@ -106,7 +108,7 @@ export class EscrowService {
       agreementId: updatedAgreement.id,
       payload: {
         agreement: updatedAgreement,
-        virtualAccount,
+        virtualAccount: vaData,
       },
     });
 
@@ -115,8 +117,8 @@ export class EscrowService {
       status: updatedAgreement.status,
       totalAmount: updatedAgreement.totalAmount,
       currency: updatedAgreement.currency,
-      squadVirtualAccountNo: updatedAgreement.squadVirtualAccountNo,
-      squadBank: virtualAccount.bank ?? 'GTBank',
+      nombaVirtualAccountNo: updatedAgreement.nombaVirtualAccountNo,
+      nombaBank: vaData?.bankName ?? 'Nomba MFB',
       buyerExternalId: updatedAgreement.buyerExternalId,
       sellerExternalId: updatedAgreement.sellerExternalId,
       createdAt: updatedAgreement.createdAt,
@@ -151,26 +153,8 @@ export class EscrowService {
         return;
       }
 
-      // Step 2 — Verify transaction with Squad
-      const verification = await this.squadService.verifyTransaction(payload.transactionRef);
-
-      if (!verification.success) {
-        this.logger.warn(
-          `Transaction ${payload.transactionRef} could not be verified by Squad. Ignoring.`
-        );
-
-        void this.developerLogService.log({
-          developerId: agreement.developerId,
-          eventType: 'ESCROW_FUND_FAILED',
-          agreementId: payload.agreementId,
-          payload: {
-            transactionRef: payload.transactionRef,
-            reason: 'Squad transaction verification failed',
-            squadStatus: verification.status,
-          }
-        });
-        return;
-      }
+      // Step 2 — Nomba payments are verified via webhook reconciliation (no separate verify call)
+      // This event is emitted by the NombaWebhookController after reconciliation passes
 
       if (agreement.status !== 'PENDING') {
         this.logger.warn(
@@ -197,8 +181,8 @@ export class EscrowService {
         agreementId: payload.agreementId,
         payload: {
           transactionRef: payload.transactionRef,
-          amount: verification.amount,
-          squadStatus: verification.status,
+          amount: agreement.totalAmount,
+          status: 'SUCCESS',
         }
       });
 
@@ -352,32 +336,22 @@ export class EscrowService {
       );
     }
 
-    let paymentLinkId = '';
-    let squadTransactionId = '';
+    let nombaTransactionId = '';
     const disbursementRef = `DISB-${milestoneId.substring(0, 8)}-${Date.now()}`;
 
     try {
-      // Step 7 — Create Squad Payment Link
-      const paymentLink = await this.squadService.createPaymentLink(
-        milestoneId,
-        milestone.amount,
-        `${agreement.buyerExternalId}@vouch.dev`,
-      );
-      paymentLinkId = paymentLink.link_id;
-
-      // Step 8 — Disburse to the Seller
-      const disbursement = await this.squadService.disburse({
-        account_number: dto.sellerAccountNumber,
-        account_name: 'Vouch Seller Payout',
-        bank_code: dto.sellerBankCode,
+      // Step 7 — Disburse to the Seller via Nomba
+      const disbursement = await this.nombaService.disburse({
+        accountNumber: dto.sellerAccountNumber,
+        bankCode: dto.sellerBankCode,
         amount: milestone.amount,
-        transaction_ref: disbursementRef,
         narration: milestone.title,
+        reference: disbursementRef,
       });
-      squadTransactionId = disbursement.transaction_reference;
+      nombaTransactionId = disbursement?.data?.transactionReference ?? disbursementRef;
 
     } catch (error: any) {
-      // Step 8.1 — Log Disbursement Failure
+      // Step 7.1 — Log Disbursement Failure
       void this.developerLogService.log({
         developerId: developer.id,
         eventType: 'DISBURSEMENT_FAILED',
@@ -385,20 +359,19 @@ export class EscrowService {
         payload: {
           milestoneId,
           amount: milestone.amount,
-          reason: error.message || 'Squad API error during disbursement',
+          reason: error.message || 'Nomba API error during disbursement',
         },
       });
 
-      throw new BadRequestException(`Squad disbursement failed: ${error.message}`);
+      throw new BadRequestException(`Nomba disbursement failed: ${error.message}`);
     }
 
-    // Step 9 — Update the Milestone Record
+    // Step 8 — Update the Milestone Record
     const finalMilestone = await this.prisma.milestone.update({
       where: { id: milestoneId },
       data: {
         status: 'DISBURSED',
-        squadTransactionId,
-        squadPaymentLinkId: paymentLinkId,
+        nombaTransactionId,
         disbursedAt: new Date(),
       },
     });
@@ -456,7 +429,7 @@ export class EscrowService {
         amount: milestone.amount,
         sellerAccountNumber: dto.sellerAccountNumber,
         sellerBankCode: dto.sellerBankCode,
-        squadTransactionId,
+        nombaTransactionId,
         disbursementRef,
       },
     });
@@ -478,7 +451,7 @@ export class EscrowService {
       include: {
         milestones: true,
         fraudAssessments: true,
-        squadSignals: true,
+        nombaTransfers: true,
       },
     });
 
@@ -609,9 +582,9 @@ export class EscrowService {
       score: fraudResult.score,
       flag: fraudResult.flag,
       triggeredSignals: fraudResult.triggered_signals || [],
-      squadVirtualAccountId: agreement.squadVirtualAccountId,
-      squadVirtualAccountNo: agreement.squadVirtualAccountNo,
-      squadBank: 'GTBank',
+      nombaVirtualAccountId: agreement.nombaVirtualAccountId,
+      nombaVirtualAccountNo: agreement.nombaVirtualAccountNo,
+      nombaBank: 'Nomba MFB',
       amount: agreement.totalAmount,
       message: 'Payment risk assessment cleared. You may proceed with funding.',
     };

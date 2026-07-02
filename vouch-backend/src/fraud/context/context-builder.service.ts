@@ -58,10 +58,10 @@ export class ContextBuilderService {
         // Step 4: run DeviceService.analyze
         const deviceData = await this.deviceService.analyze(deviceFingerprint, platformUserId);
 
-        // Step 5: query squadSignal table
-        let latestSquadSignal: any = null;
+        // Step 5: query nombaTransfer table
+        let latestTransfer: any = null;
         if (agreementId) {
-            latestSquadSignal = await this.prisma.squadSignal.findFirst({
+            latestTransfer = await this.prisma.nombaTransfer.findFirst({
                 where: { agreementId },
                 orderBy: { createdAt: 'desc' },
             });
@@ -90,12 +90,12 @@ export class ContextBuilderService {
             identity_verified: platformUser.identityVerified,
             identity_match_score: platformUser.identityMatchScore ?? 0,
             liveness_passed: platformUser.livenessPassed,
-            // Squad signals
-            squad_payment_channel: latestSquadSignal?.paymentChannel ?? undefined,
-            squad_card_bin: latestSquadSignal?.cardBin ?? undefined,
-            squad_payer_name: latestSquadSignal?.payerName ?? undefined,
-            squad_amount_matches_agreement: latestSquadSignal?.amountMatchesAgreement ?? undefined,
-            squad_transaction_ref: latestSquadSignal?.transactionRef ?? undefined,
+            // Squad/Nomba signals
+            squad_payment_channel: latestTransfer ? 'bank_transfer' : undefined,
+            squad_card_bin: undefined,
+            squad_payer_name: latestTransfer?.senderName ?? undefined,
+            squad_amount_matches_agreement: latestTransfer ? (latestTransfer.amount === transactionAmount) : undefined,
+            squad_transaction_ref: latestTransfer?.nombaReference ?? undefined,
         };
 
         // Step 7: apply simulation overrides

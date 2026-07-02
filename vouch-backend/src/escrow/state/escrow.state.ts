@@ -4,11 +4,14 @@ import { EscrowStatus } from '@prisma/client';
 @Injectable()
 export class EscrowState {
   private readonly VALID_TRANSITIONS: Record<EscrowStatus, EscrowStatus[]> = {
-    PENDING:     ['FUNDED', 'FROZEN'],
-    FUNDED:      ['IN_PROGRESS', 'COMPLETED', 'DISBURSED', 'FROZEN'],
+    PENDING:     ['PARTIAL', 'FUNDED', 'OVERFUNDED', 'FROZEN'],
+    PARTIAL:     ['PARTIAL', 'FUNDED', 'OVERFUNDED', 'FROZEN'],
+    FUNDED:      ['OVERFUNDED', 'IN_PROGRESS', 'COMPLETED', 'DISBURSED', 'FROZEN'],
+    OVERFUNDED:  ['IN_PROGRESS', 'COMPLETED', 'DISBURSED', 'FROZEN', 'REFUNDED'],
     IN_PROGRESS: ['COMPLETED', 'DISBURSED', 'FROZEN'],
     COMPLETED:   ['DISBURSED', 'FROZEN'],
     DISBURSED:   [],
+    REFUNDED:    [],
     FROZEN:      [],
   };
 

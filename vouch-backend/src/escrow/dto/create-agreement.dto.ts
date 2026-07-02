@@ -17,7 +17,7 @@ export class CreateAgreementDto {
   @Type(() => CreateMilestoneDto)
   milestones: CreateMilestoneDto[];
 
-  // Needed for Squad virtual account creation
+  // Needed for Nomba virtual account creation
   @IsOptional()
   @IsString()
   buyerEmail?: string;
