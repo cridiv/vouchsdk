@@ -134,7 +134,7 @@ const HowItWorks = () => {
             <p className="text-gray-400 font-dm-sans leading-relaxed text-base lg:text-lg">
               Our AI scores the transaction risk in real-time. It actively
               analyzes network signals, IP reputation, and behavioral anomalies
-              before Squad is ever called.
+              before Nomba is ever called.
             </p>
           </motion.div>
         </div>
@@ -150,10 +150,10 @@ const HowItWorks = () => {
               03
             </div>
             <h3 className="text-3xl lg:text-4xl font-syne font-bold mb-6">
-              Escrow via Squad Rails
+              Escrow via Nomba Rails
             </h3>
             <p className="text-gray-400 font-dm-sans leading-relaxed text-base lg:text-lg mb-8">
-              A secure Squad Virtual Account is generated exclusively for the
+              A secure Nomba Virtual Account is generated exclusively for the
               agreement. The buyer pays into this escrow, so money never moves
               directly to an untrusted vendor.
             </p>
@@ -212,7 +212,7 @@ const HowItWorks = () => {
                 agreementId: <span className="text-green-300">'"ag_77b2"'</span>
               </div>
               <div>{"});"}</div>
-              <div className="text-gray-500 mt-4">// Squad API returns:</div>
+              <div className="text-gray-500 mt-4">// Nomba API returns:</div>
               <div className="text-gray-500">
                 // {`"virtualAccount"`}: "9922334455"
               </div>
@@ -260,7 +260,7 @@ const HowItWorks = () => {
               <div>{"});"}</div>
               <div className="mt-4">
                 <span className="text-gray-400">
-                  ✓ Generating Squad Payment Link...
+                  ✓ Generating Nomba Checkout Link...
                 </span>
                 <br />
                 <span className="text-gray-400">
@@ -268,9 +268,9 @@ const HowItWorks = () => {
                 </span>
               </div>
               <div className="text-gray-500 mt-4">
-                // Returns Squad Audit Record:
+                // Returns Nomba Audit Record:
               </div>
-              <div className="text-gray-500">// {`"txRef"`}: "SQD_abc123"</div>
+              <div className="text-gray-500">// {`"txRef"`}: "NMB_abc123"</div>
               <div className="text-gray-500">
                 // {`"completedAt"`}: "2026-05-13T14:32:00Z"
               </div>
@@ -291,7 +291,7 @@ const HowItWorks = () => {
             </h3>
             <p className="text-gray-400 font-dm-sans leading-relaxed text-base lg:text-lg">
               After delivery confirmation and a final fraud check, funds are
-              autonomously disbursed using a Squad Payment Link. Every release
+              autonomously disbursed using a Nomba Checkout Link. Every release
               is an immutable audit record tied to a real transaction hash.
             </p>
           </motion.div>

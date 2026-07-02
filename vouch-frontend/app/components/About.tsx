@@ -152,7 +152,7 @@ const About = () => {
             >
               <p className="text-gray-400 text-lg leading-relaxed font-dm-sans mb-8">
                 Vouch uses AI-powered fraud analysis, identity verification, and
-                Squad APIs to make trust a first-class requirement. We score
+                Nomba APIs to make trust a first-class requirement. We score
                 risk, verify who you are, and securely hold funds until everyone
                 is happy.
               </p>
@@ -180,8 +180,8 @@ const About = () => {
                     <Wallet className="w-5 h-5" />
                   </div>
                   <span className="text-gray-300 text-sm">
-                    Squad Vaults — autonomous escrow holding until transaction
-                    validates
+                    Nomba Virtual Accounts — autonomous escrow holding until
+                    transaction validates
                   </span>
                 </li>
                 <li className="flex items-start gap-4">

@@ -79,7 +79,7 @@ const Features = () => {
           >
             <div className="bg-[#0b0b0f] border border-gray-800 rounded-2xl flex flex-col gap-6 p-8 group h-full overflow-hidden transition-all hover:bg-[#121217]">
               <img
-                alt=" Escrow & Squad Rails"
+                alt=" Escrow & Nomba Rails"
                 loading="lazy"
                 width="420"
                 height="420"
@@ -88,10 +88,10 @@ const Features = () => {
               />
               <div className="space-y-4 mt-auto">
                 <h4 className="font-syne text-xl md:text-2xl font-semibold text-white">
-                  Escrow & Squad Rails
+                  Escrow & Nomba Rails
                 </h4>
                 <p className="font-dm-sans text-gray-400 leading-relaxed text-sm md:text-base">
-                  Secure funds automatically using Squad virtual accounts.
+                  Secure funds automatically using Nomba virtual accounts.
                   Disbursements are strictly gated by AI risk clearance and
                   confirmed deliveries.
                 </p>

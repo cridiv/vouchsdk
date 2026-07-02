@@ -76,7 +76,7 @@ const Footer = () => {
       {/* Bottom Footer */}
       <div className="max-w-6xl mx-auto mt-12 pt-6 border-t border-gray-800 text-xs text-gray-500 font-dm-sans flex flex-col sm:flex-row justify-between gap-2">
         <span>© 2026 Vouch · MIT License</span>
-        <span>Built for absolute trust · Squad Hackathon</span>
+        <span>Built for absolute trust · Nomba Hackathon</span>
       </div>
     </footer>
   );

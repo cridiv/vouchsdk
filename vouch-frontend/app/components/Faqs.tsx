@@ -8,12 +8,12 @@ const faqs = [
   {
     question: "What is Vouch?",
     answer:
-      "Vouch is a trust infrastructure SDK—built from the ground up for marketplaces, peer-to-peer platforms, and escrow services. It combines Identity Verification, a real-time Fraud Engine, and secure Escrow via Squad Rails to ensure money never moves until trust is fully proven.",
+      "Vouch is a trust infrastructure SDK—built from the ground up for marketplaces, peer-to-peer platforms, and escrow services. It combines Identity Verification, a real-time Fraud Engine, and secure Escrow via Nomba Rails to ensure money never moves until trust is fully proven.",
   },
   {
     question: "How fast is the Fraud Engine?",
     answer:
-      "Sub-second analysis. The Fraud Engine evaluates IP reputation, behavioral signals, and network anomalies in real-time, actively scoring transaction risk before a Squad Virtual Account is ever generated or funds are moved.",
+      "Sub-second analysis. The Fraud Engine evaluates IP reputation, behavioral signals, and network anomalies in real-time, actively scoring transaction risk before a Nomba Virtual Account is ever generated or funds are moved.",
   },
   {
     question: "Is Vouch easy to integrate?",
