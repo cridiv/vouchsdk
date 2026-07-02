@@ -6,6 +6,10 @@
 
 These rules are used in the weighted rule engine for fraud scoring.
 
+```
+Base Score: 20
+Range: 0–100 (clamped)
+```
 
 ### Network & Location Rules
 
