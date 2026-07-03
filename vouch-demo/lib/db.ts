@@ -145,7 +145,7 @@ export async function getDb(): Promise<Database> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845'
+        'x-api-key': process.env.NEXT_PUBLIC_VOUCH_API_KEY || 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845'
       },
       body: JSON.stringify({ externalUserId: email })
     })

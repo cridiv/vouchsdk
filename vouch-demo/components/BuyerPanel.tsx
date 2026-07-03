@@ -4,6 +4,8 @@ import { Plus, Copy, Receipt, Send, ShieldAlert, Sparkles, RefreshCw, CheckCircl
 import { StatementModal } from './StatementModal';
 import { GIG_PRESETS } from './FreelancerPanel';
 
+const VOUCH_API_KEY = process.env.NEXT_PUBLIC_VOUCH_API_KEY || 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845';
+
 // Web Crypto HMAC-SHA256 Helper
 async function generateHmac(body: string, secret: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -66,7 +68,7 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
           const res = await fetch(`http://localhost:5000/escrow/agreements/${id}`, {
             method: 'GET',
             headers: {
-              'x-api-key': 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845',
+              'x-api-key': VOUCH_API_KEY,
             },
           });
           if (res.ok) {
@@ -127,7 +129,7 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845',
+          'x-api-key': VOUCH_API_KEY,
         },
         body: JSON.stringify({
           buyerExternalId: currentUser.email,
@@ -221,7 +223,7 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845',
+          'x-api-key': VOUCH_API_KEY,
         },
         body: JSON.stringify({
           externalUserId: currentUser.email,
@@ -251,7 +253,7 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845',
+          'x-api-key': VOUCH_API_KEY,
         },
       });
 
@@ -309,9 +311,19 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
                   className="bg-[#0a0a0c] border border-white/5 rounded-3xl overflow-hidden hover:border-purple-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between"
                 >
                   {/* Card Illustration */}
-                  <div className={`h-28 bg-gradient-to-br ${preset.gradient} flex items-center justify-center text-4xl relative`}>
-                    <span>{preset.icon}</span>
-                    <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider text-white">
+                  <div className="h-28 relative overflow-hidden bg-gray-900 flex items-center justify-center">
+                    {gig.imageUrl ? (
+                      <img 
+                        src={gig.imageUrl} 
+                        alt={gig.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className={`w-full h-full bg-gradient-to-br ${preset.gradient} flex items-center justify-center text-4xl`}>
+                        <span>{preset.icon}</span>
+                      </div>
+                    )}
+                    <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider text-white">
                       {gig.serviceType}
                     </div>
                   </div>
@@ -448,10 +460,11 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
               const milestone = agreement.milestones?.[0];
               const isDisbursed = milestone?.status === 'DISBURSED' || agreement.status === 'DISBURSED';
               const isReleased = milestone?.buyerConfirmed === true;
+              const displayId = agreement.id || agreement.agreementId || '';
 
               return (
                 <div
-                  key={agreement.id}
+                  key={displayId}
                   className="bg-[#0a0a0c] border border-white/5 rounded-3xl p-6 flex flex-col justify-between hover:border-purple-500/25 transition-all duration-300 relative"
                 >
                   <div>
@@ -461,7 +474,7 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
                         <h3 className="font-bold text-lg text-white truncate max-w-[200px]">
                           {milestone?.title.replace('Milestone 1: ', '') || 'Project Contract'}
                         </h3>
-                        <span className="text-xs font-mono text-gray-500 block mt-0.5">ID: {agreement.id.substring(0, 8)}</span>
+                        <span className="text-xs font-mono text-gray-500 block mt-0.5">ID: {displayId.substring(0, 8)}</span>
                       </div>
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase ${
                         agreement.status === 'FUNDED' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
@@ -522,7 +535,7 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
                         </div>
                         <div className="flex justify-between text-xs text-gray-500 font-mono mt-1">
                           <span>Bank: {agreement.nombaBank || 'Nombank MFB'}</span>
-                          <span>Ref: {agreement.id.substring(0, 8)}</span>
+                          <span>Ref: {displayId.substring(0, 8)}</span>
                         </div>
                       </div>
                     )}
@@ -542,14 +555,14 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
                             <input
                               type="number"
                               placeholder="Transfer amount..."
-                              value={simAmounts[agreement.id] || ''}
-                              onChange={(e) => setSimAmounts({ ...simAmounts, [agreement.id]: e.target.value })}
+                              value={simAmounts[displayId] || ''}
+                              onChange={(e) => setSimAmounts({ ...simAmounts, [displayId]: e.target.value })}
                               className="w-full pl-7 pr-3 py-2 bg-black/60 border border-white/10 rounded-xl text-white font-mono text-sm focus:outline-none focus:border-purple-500/50"
                             />
                           </div>
                           <button
                             onClick={() => {
-                              const amt = parseFloat(simAmounts[agreement.id] || '0');
+                              const amt = parseFloat(simAmounts[displayId] || '0');
                               if (amt <= 0 || isNaN(amt)) {
                                 alert('Please enter a valid transfer amount.');
                                 return;
@@ -585,7 +598,7 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
                     {/* View Statement button */}
                     <button
                       onClick={() => {
-                        setSelectedAgreementId(agreement.id);
+                        setSelectedAgreementId(displayId);
                         setShowStatement(true);
                       }}
                       className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-xl text-sm border border-white/5 transition-colors flex items-center justify-center gap-1 cursor-pointer"
@@ -597,7 +610,7 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
                     {/* Reclaim excess overpayment button */}
                     {agreement.status === 'OVERFUNDED' && excess > 0 && (
                       <button
-                        onClick={() => handleClaimRefund(agreement.id, excess)}
+                        onClick={() => handleClaimRefund(displayId, excess)}
                         className="flex-1 py-3 bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-500/20 font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-1 cursor-pointer"
                       >
                         <span>Reclaim ₦{excess.toLocaleString()} Excess</span>
@@ -607,12 +620,12 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
                     {/* Release funds to seller */}
                     {shortfall === 0 && !isDisbursed && !isReleased && (
                       <button
-                        onClick={() => handleReleaseFunds(agreement.id, milestone.id)}
-                        disabled={releasingIds[agreement.id]}
+                        onClick={() => handleReleaseFunds(displayId, milestone.id)}
+                        disabled={releasingIds[displayId]}
                         className={`flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-800/40 disabled:text-green-500 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed`}
                       >
                         <CheckCircle2 className="w-4 h-4" />
-                        <span>{releasingIds[agreement.id] ? 'Releasing Payout...' : 'Release Payout'}</span>
+                        <span>{releasingIds[displayId] ? 'Releasing Payout...' : 'Release Payout'}</span>
                       </button>
                     )}
 

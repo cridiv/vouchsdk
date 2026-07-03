@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Receipt, CheckCircle, RefreshCw, AlertCircle, FileText, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 
+const VOUCH_API_KEY = process.env.NEXT_PUBLIC_VOUCH_API_KEY || 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845';
+
 interface StatementModalProps {
   isOpen: boolean;
   agreementId: string;
@@ -24,7 +26,7 @@ export const StatementModal: React.FC<StatementModalProps> = ({
       const res = await fetch(`http://localhost:5000/escrow/agreements/${agreementId}/statement`, {
         method: 'GET',
         headers: {
-          'x-api-key': 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845',
+          'x-api-key': VOUCH_API_KEY,
         },
       });
 

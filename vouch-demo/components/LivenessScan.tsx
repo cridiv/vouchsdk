@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, ShieldCheck, RefreshCw, CheckCircle2, User } from 'lucide-react';
 
+const VOUCH_API_KEY = process.env.NEXT_PUBLIC_VOUCH_API_KEY || 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845';
+
 interface LivenessScanProps {
   isOpen: boolean;
   externalUserId: string;
@@ -69,7 +71,7 @@ export const LivenessScan: React.FC<LivenessScanProps> = ({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845',
+            'x-api-key': VOUCH_API_KEY,
           },
           body: JSON.stringify({ externalUserId }),
         });

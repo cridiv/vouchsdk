@@ -26,7 +26,6 @@ import {
   AlertTriangle,
   ExternalLink,
 } from "lucide-react";
-import { supabase } from "../../lib/supabase";
 import { CredentialsCard } from "./components/CredentialsCard";
 import { AnalyticsSection } from "./components/AnalyticsSection";
 import { FeaturesSection } from "./components/FeaturesSection";
@@ -40,109 +39,55 @@ const DashboardPage = () => {
   const [isProvisioning, setIsProvisioning] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
+  // Live Metrics states
+  const [stats, setStats] = useState<any>(null);
+  const [logsData, setLogsData] = useState<any[]>([]);
+
+  const fetchStatsAndLogs = async (apiKey: string) => {
+    try {
+      const [statsRes, logsRes] = await Promise.all([
+        fetch("http://localhost:5000/developer/stats", {
+          headers: { "x-api-key": apiKey }
+        }),
+        fetch("http://localhost:5000/developer/logs?limit=15", {
+          headers: { "x-api-key": apiKey }
+        })
+      ]);
+
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setStats(statsData);
+      }
+      if (logsRes.ok) {
+        const logsPayload = await logsRes.json();
+        setLogsData(logsPayload.logs || []);
+      }
+    } catch (err) {
+      console.error("Failed to load developer live metrics:", err);
+    }
+  };
+
   useEffect(() => {
     const init = async () => {
-      // Step 1 — Hash present means fresh OAuth redirect
-      const hash = window.location.hash;
-      if (hash && hash.includes('access_token')) {
-        const params = new URLSearchParams(hash.substring(1));
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-
-        if (accessToken && refreshToken) {
-          window.history.replaceState(null, '', window.location.pathname);
-
-          const { data, error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-
-          if (error || !data.session) {
-            setAuthError('Session expired. Please sign in again.');
-            setIsProvisioning(false);
-            return;
-          }
-
-          await provision(data.session.user);
-          return;
-        }
-      }
-
-      // Step 2 — No hash — Supabase auto-restores persisted session
-      const { data: { session }, error } = await supabase.auth.getSession();
-
-      if (session) {
-        await provision(session.user);
-        return;
-      }
-
-      // Step 3 — No session at all
-      window.location.href = '/signin';
-    };
-
-    const provision = async (user: any) => {
-      setUserData(user);
-
-      // Check if we already have provision data cached
-      const cachedKey = localStorage.getItem('vouch_api_key');
       const cachedDevId = localStorage.getItem('vouch_dev_id');
       const cachedEmail = localStorage.getItem('vouch_dev_email');
+      const cachedPrefix = localStorage.getItem('vouch_key_prefix');
+      const cachedApiKey = localStorage.getItem('vouch_api_key') || '';
 
-      if (cachedDevId && cachedEmail === user.email) {
-        // Returning user — use cached data, skip backend call
-        setProvisionData({
-          developerId: cachedDevId,
-          apiKey: { prefix: localStorage.getItem('vouch_key_prefix') || '' },
-        });
-        setIsProvisioning(false);
+      if (!cachedDevId || !cachedEmail) {
+        window.location.href = '/signin';
         return;
       }
 
-      // First time or cache miss — hit the backend
-      setIsProvisioning(true);
-      setAuthError(null);
+      setUserData({ email: cachedEmail });
+      setProvisionData({
+        developerId: cachedDevId,
+        apiKey: { prefix: cachedPrefix || '' },
+      });
+      setIsProvisioning(false);
 
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 55000);
-
-        const res = await fetch('https://vouch-fmql.onrender.com/v1/developer/provision', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          signal: controller.signal,
-          body: JSON.stringify({
-            email: user.email || "developer@github.com",
-            supabaseUid: user.id,
-            name: user.user_metadata?.full_name || user.email?.split('@')[0] || "GitHub Developer",
-            avatarUrl: user.user_metadata?.avatar_url || '',
-            metadata: user.user_metadata || {},
-          }),
-        });
-
-        clearTimeout(timeout);
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Provision failed');
-
-        // Cache everything for return visits
-        localStorage.setItem('vouch_dev_id', data.developerId || '');
-        localStorage.setItem('vouch_dev_email', user.email);
-        localStorage.setItem('vouch_key_prefix', data.apiKey?.prefix || '');
-
-        // Only store raw key if it is a new key (first time)
-        if (data.apiKey?.rawKey) {
-          localStorage.setItem('vouch_api_key', data.apiKey.rawKey);
-        }
-
-        setProvisionData(data);
-      } catch (err: any) {
-        if (err.name === 'AbortError') {
-          setAuthError('Server is waking up — please wait 30 seconds and refresh.');
-        } else {
-          setAuthError(err.message || 'Authentication failed');
-        }
-      } finally {
-        setIsProvisioning(false);
+      if (cachedApiKey) {
+        await fetchStatsAndLogs(cachedApiKey);
       }
     };
 
@@ -150,8 +95,6 @@ const DashboardPage = () => {
   }, []);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    
     // Clear all cached provision data
     localStorage.removeItem('vouch_api_key');
     localStorage.removeItem('vouch_dev_id');
@@ -337,7 +280,14 @@ const DashboardPage = () => {
 
             {activeTab === "analytics" ? (
               <>
-                <AnalyticsSection />
+                 <AnalyticsSection 
+                  stats={stats} 
+                  logs={logsData} 
+                  onRefresh={() => {
+                    const key = localStorage.getItem('vouch_api_key');
+                    if (key) fetchStatsAndLogs(key);
+                  }} 
+                />
                 <FeaturesSection />
                 <DashboardLinks />
               </>

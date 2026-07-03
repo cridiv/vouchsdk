@@ -1,8 +1,9 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Briefcase, Receipt, Star, Clock, CheckCircle2, ShieldCheck, RefreshCw, Plus, Sparkles } from 'lucide-react';
+import { Briefcase, Receipt, Star, Clock, CheckCircle2, ShieldCheck, RefreshCw, Plus, Sparkles, Upload } from 'lucide-react';
 import { StatementModal } from './StatementModal';
 
+const VOUCH_API_KEY = process.env.NEXT_PUBLIC_VOUCH_API_KEY || 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845';
 interface FreelancerPanelProps {
   currentUser: { email: string; name: string; role: string };
   activeTab: 'dashboard' | 'marketplace' | 'my-gigs' | 'settings';
@@ -68,7 +69,7 @@ export const FreelancerPanel: React.FC<FreelancerPanelProps> = ({ currentUser, a
         {
           method: 'GET',
           headers: {
-            'x-api-key': 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845',
+            'x-api-key': VOUCH_API_KEY,
           },
         }
       );
@@ -104,10 +105,33 @@ export const FreelancerPanel: React.FC<FreelancerPanelProps> = ({ currentUser, a
     loadMyGigs();
   }, [currentUser.email]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'image/png') {
+      alert('Only PNG images are accepted.');
+      e.target.value = ''; // clear input
+      setGigImageUrl('');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setGigImageUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleCreateGig = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!gigName || !gigDescription || !gigPrice) {
       alert('Please fill out all fields.');
+      return;
+    }
+
+    if (!gigImageUrl) {
+      alert('Please upload a cover image for your service (PNG only).');
       return;
     }
 
@@ -125,7 +149,8 @@ export const FreelancerPanel: React.FC<FreelancerPanelProps> = ({ currentUser, a
       price: priceNum,
       presetId: selectedPreset,
       freelancerEmail: currentUser.email,
-      freelancerName: currentUser.name
+      freelancerName: currentUser.name,
+      imageUrl: gigImageUrl
     };
 
     try {
@@ -209,27 +234,36 @@ export const FreelancerPanel: React.FC<FreelancerPanelProps> = ({ currentUser, a
                 </select>
               </div>
 
-              {/* Theme Preset Selection */}
-              <div className="space-y-1.5">
-                <label className="text-xs text-gray-500 font-semibold uppercase tracking-wider block">Card Style Theme</label>
-                <div className="grid grid-cols-4 gap-3">
-                  {GIG_PRESETS.map((preset) => (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedPreset(preset.id);
-                        setGigCategory(preset.name);
-                      }}
-                      className={`h-12 rounded-xl flex items-center justify-center text-xl transition-all cursor-pointer border ${selectedPreset === preset.id
-                          ? 'border-purple-500 bg-purple-500/10 scale-105 shadow-md shadow-purple-500/5'
-                          : 'border-white/5 bg-[#111115] opacity-60 hover:opacity-100'
-                        }`}
-                      title={preset.name}
-                    >
-                      {preset.icon}
-                    </button>
-                  ))}
+              {/* Cover Banner Image Upload */}
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-xs text-gray-500 font-semibold uppercase tracking-wider block">Cover Banner Image (PNG Only)</label>
+                <div className="flex flex-col sm:flex-row items-center gap-4 bg-[#111115] border border-white/5 rounded-xl p-4">
+                  <div className="relative flex-1 w-full">
+                    <input
+                      type="file"
+                      accept="image/png"
+                      onChange={handleFileChange}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                    />
+                    <div className="border border-dashed border-white/10 rounded-lg p-6 text-center hover:border-purple-500/40 transition-colors flex flex-col items-center justify-center gap-2">
+                      <Upload className="w-5 h-5 text-gray-400" />
+                      <span className="text-xs text-gray-400">Click or drag your PNG cover image here</span>
+                      <span className="text-[10px] text-gray-500">Only .png files are accepted</span>
+                    </div>
+                  </div>
+                  {gigImageUrl && (
+                    <div className="relative w-24 h-20 rounded-lg overflow-hidden border border-white/10 bg-black/40 flex-shrink-0 flex items-center justify-center">
+                      <img src={gigImageUrl} alt="Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setGigImageUrl('')}
+                        className="absolute top-1 right-1 bg-black/80 hover:bg-red-600 text-white rounded-full p-0.5 text-[8px] font-bold w-4 h-4 flex items-center justify-center cursor-pointer z-20"
+                        title="Remove image"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -273,9 +307,19 @@ export const FreelancerPanel: React.FC<FreelancerPanelProps> = ({ currentUser, a
                     className="bg-[#0a0a0c] border border-white/5 rounded-3xl overflow-hidden hover:border-purple-500/25 transition-all duration-300 flex flex-col justify-between"
                   >
                     {/* Gig Card Top Illustration */}
-                    <div className={`h-28 bg-gradient-to-br ${preset.gradient} flex items-center justify-center text-4xl relative`}>
-                      <span>{preset.icon}</span>
-                      <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider text-white">
+                    <div className="h-28 relative overflow-hidden bg-gray-900 flex items-center justify-center">
+                      {gig.imageUrl ? (
+                        <img 
+                          src={gig.imageUrl} 
+                          alt={gig.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className={`w-full h-full bg-gradient-to-br ${preset.gradient} flex items-center justify-center text-4xl`}>
+                          <span>{preset.icon}</span>
+                        </div>
+                      )}
+                      <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider text-white">
                         {gig.serviceType}
                       </div>
                     </div>

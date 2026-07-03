@@ -297,5 +297,22 @@ export class DeveloperService {
             totalEscrowValue: escrowSum._sum.totalAmount || 0,
         };
     }
+
+    async findByEmail(email: string) {
+        return this.prisma.developer.findUnique({
+            where: { email },
+        });
+    }
+
+    async getOrCreateApiKey(developerId: string) {
+        const existing = await this.prisma.apiKey.findFirst({
+            where: { developerId },
+        });
+        if (existing) {
+            // Since we can't retrieve the raw key (it's hashed), generate a new one
+            return this.generateApiKey(developerId);
+        }
+        return this.generateApiKey(developerId);
+    }
 }
 

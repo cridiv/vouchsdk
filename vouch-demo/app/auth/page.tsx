@@ -4,7 +4,7 @@ import { ShieldCheck, Mail, Lock, User, ArrowRight, Briefcase } from 'lucide-rea
 import { Vouch } from '@/lib/vouch-sdk/vouch';
 import Image from 'next/image';
 
-const vouch = new Vouch('vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845', {
+const vouch = new Vouch(process.env.NEXT_PUBLIC_VOUCH_API_KEY || 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845', {
   apiUrl: 'http://localhost:5000',
   verifyUrl: 'http://localhost:3001',
 });

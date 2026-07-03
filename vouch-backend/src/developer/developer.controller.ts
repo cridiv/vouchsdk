@@ -4,6 +4,8 @@ import { IsEmail, IsNotEmpty, IsString, IsOptional } from 'class-validator';
 import { ApiKeyGuard } from './guard/api-key.guard';
 import { CurrentDeveloper } from '../common/decorators/current-developer.decorator.js';
 import * as client from '@prisma/client';
+import * as crypto from 'crypto';
+
 export class ProvisionDeveloperDto {
     @IsEmail()
     email: string;
@@ -24,6 +26,28 @@ export class ProvisionDeveloperDto {
     metadata?: any;
 }
 
+export class DeveloperSignupDto {
+    @IsEmail()
+    email: string;
+
+    @IsString()
+    @IsNotEmpty()
+    password: string;
+
+    @IsString()
+    @IsOptional()
+    name?: string;
+}
+
+export class DeveloperLoginDto {
+    @IsEmail()
+    email: string;
+
+    @IsString()
+    @IsNotEmpty()
+    password: string;
+}
+
 export class GenerateApiKeyDto {
     @IsString()
     @IsNotEmpty()
@@ -34,6 +58,49 @@ export class GenerateApiKeyDto {
 @Controller('developer')
 export class DeveloperController {
     constructor(private readonly developerService: DeveloperService) { }
+
+    @Post('signup')
+    @HttpCode(HttpStatus.CREATED)
+    async signup(@Body() body: DeveloperSignupDto) {
+        const passwordHash = crypto.createHash('sha256').update(body.password).digest('hex');
+        const mockSupabaseUid = 'local_' + crypto.randomBytes(16).toString('hex');
+        const result = await this.developerService.provision(
+            body.email,
+            mockSupabaseUid,
+            body.name || body.email.split('@')[0],
+            undefined,
+            { passwordHash },
+        );
+        return {
+            developerId: result.developer.id,
+            apiKey: result.apiKey.rawKey,
+            developer: result.developer,
+        };
+    }
+
+    @Post('login')
+    @HttpCode(HttpStatus.OK)
+    async login(@Body() body: DeveloperLoginDto) {
+        const passwordHash = crypto.createHash('sha256').update(body.password).digest('hex');
+        
+        const developer = await this.developerService.findByEmail(body.email);
+        if (!developer) {
+            throw new NotFoundException('Invalid email or password.');
+        }
+        
+        const metadata = developer.metadata as any;
+        if (!metadata || metadata.passwordHash !== passwordHash) {
+            throw new NotFoundException('Invalid email or password.');
+        }
+        
+        const apiKey = await this.developerService.getOrCreateApiKey(developer.id);
+        
+        return {
+            developerId: developer.id,
+            apiKey: apiKey.rawKey,
+            developer,
+        };
+    }
 
     @Post('provision')
     @HttpCode(HttpStatus.OK)
