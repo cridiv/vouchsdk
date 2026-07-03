@@ -26,10 +26,13 @@ function VerifyContent() {
   const [result, setResult] = useState<any>(null)
 
   const [apiUrl, setApiUrl] = useState('http://localhost:5000');
+  const [isLocalhost, setIsLocalhost] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      setIsLocalhost(isLocal);
+      if (!isLocal) {
         setApiUrl('https://vouch-fmql.onrender.com/v1');
       }
     }
@@ -98,6 +101,34 @@ function VerifyContent() {
     setLoading(false)
   }
 
+  const handleSimulateBypass = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${apiUrl}/developer/mark-verified`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey || '',
+        },
+        body: JSON.stringify({ externalUserId: userId }),
+      });
+      if (!res.ok) throw new Error('Bypass call failed');
+      
+      setResult({
+        identityVerified: true,
+        identityMatchScore: 95,
+        livenessPassed: true,
+        documentType: 'test_bypass',
+      });
+      setStep(4);
+    } catch (err: any) {
+      setError(err.message || 'Bypass failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!userId || !apiKey) {
     return (
       <div className="card">
@@ -119,6 +150,20 @@ function VerifyContent() {
         </div>
 
         <StepIndicator current={step} />
+
+        {/* Dev Mode Bypass Button */}
+        {isLocalhost && (
+          <div className="dev-bypass-container">
+            <button 
+              type="button" 
+              onClick={handleSimulateBypass}
+              className="dev-bypass-btn"
+              id="dev-bypass-btn"
+            >
+              ⚡ Dev Bypass Verification
+            </button>
+          </div>
+        )}
 
         {step === 1 && (
           <DocTypeSelector
@@ -247,6 +292,27 @@ function VerifyContent() {
           font-size: 11px;
           color: #9ca3af;
           font-weight: 500;
+        }
+
+        .dev-bypass-container {
+          margin-bottom: 20px;
+          display: flex;
+          justify-content: center;
+        }
+        .dev-bypass-btn {
+          background: #fef3c7;
+          border: 1px solid #f59e0b;
+          color: #b45309;
+          font-size: 11px;
+          font-weight: 600;
+          padding: 6px 12px;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .dev-bypass-btn:hover {
+          background: #fde68a;
+          transform: scale(1.02);
         }
 
         @media (max-width: 520px) {

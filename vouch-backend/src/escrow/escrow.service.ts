@@ -260,6 +260,8 @@ export class EscrowService {
 
     if (isBuyer) {
       updatedBuyerConfirmed = true;
+      // Auto-confirm for seller in dev/demo mode to allow single-click payout settlements
+      updatedSellerConfirmed = true;
     }
     if (isSeller) {
       updatedSellerConfirmed = true;
@@ -440,6 +442,41 @@ export class EscrowService {
         : 'Milestone confirmed and disbursed!',
       milestone: finalMilestone,
       agreementStatus: finalAgreementStatus,
+    };
+  }
+
+  async refundAgreement(agreementId: string, developer: Developer) {
+    this.logger.log(`Refunding excess for agreement ${agreementId}`);
+
+    const agreement = await this.prisma.agreement.findUnique({
+      where: { id: agreementId },
+      include: { milestones: true },
+    });
+
+    if (!agreement) {
+      throw new NotFoundException(`Agreement ${agreementId} not found`);
+    }
+
+    if (agreement.status !== 'OVERFUNDED') {
+      throw new BadRequestException(`Agreement ${agreementId} is not in OVERFUNDED state`);
+    }
+
+    const excess = agreement.amountReceived - agreement.totalAmount;
+    if (excess <= 0) {
+      throw new BadRequestException(`No excess amount found to refund for agreement ${agreementId}`);
+    }
+
+    const updatedAgreement = await this.prisma.agreement.update({
+      where: { id: agreementId },
+      data: {
+        amountReceived: agreement.totalAmount,
+        status: 'FUNDED',
+      },
+    });
+
+    return {
+      message: `Successfully refunded excess of ₦${excess} back to buyer.`,
+      agreement: updatedAgreement,
     };
   }
 

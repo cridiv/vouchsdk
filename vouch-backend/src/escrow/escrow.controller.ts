@@ -71,4 +71,13 @@ export class EscrowController {
   ) {
     return this.escrowService.simulatePayment(id, body.transactionRef, developer);
   }
+
+  @Post('agreements/:id/refund')
+  @UseGuards(ApiKeyGuard)
+  async refundAgreement(
+    @Param('id') id: string,
+    @CurrentDeveloper() developer: Developer,
+  ) {
+    return this.escrowService.refundAgreement(id, developer);
+  }
 }

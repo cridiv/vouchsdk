@@ -5,6 +5,12 @@ import express from 'express';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.enableCors({
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+  });
+
   // Raw body buffer required for HMAC-SHA256 signature verification on the Nomba webhook route.
   // All other routes continue to receive parsed JSON via the default NestJS body parser.
   app.use(

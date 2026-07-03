@@ -17,7 +17,7 @@ export default function AuthPage() {
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -26,64 +26,56 @@ export default function AuthPage() {
       return;
     }
 
-    if (isLogin) {
-      // ── Sign In Logic ──────────────────────────────────────────────────────
-      const savedUserStr = localStorage.getItem(`user_${email}`);
-      if (!savedUserStr) {
-        setError('No account registered with this email. Please sign up!');
-        return;
-      }
-
-      const savedUser = JSON.parse(savedUserStr);
-      if (savedUser.password !== password) {
-        setError('Invalid password. Please try again.');
-        return;
-      }
-
-      // Log in
-      localStorage.setItem('current_user', JSON.stringify({
-        email: savedUser.email,
-        name: savedUser.name,
-        role: savedUser.role,
-        isVerified: true
-      }));
-      
-      window.location.href = '/dashboard';
-    } else {
-      // ── Sign Up Logic (Requires Vouch SDK Verification) ────────────────────
-      setError(null);
-      
-      vouch.identity.verify(email)
-        .then((result: any) => {
-          // Save user record to mock database (localStorage)
-          const userPayload = {
-            email,
-            password,
-            name,
-            role,
-            isVerified: true,
-            createdAt: new Date().toISOString()
-          };
-
-          localStorage.setItem(`user_${email}`, JSON.stringify(userPayload));
-          
-          // Log user in
-          localStorage.setItem('current_user', JSON.stringify({
-            email: userPayload.email,
-            name: userPayload.name,
-            role: userPayload.role,
-            isVerified: true
-          }));
-
-          window.location.href = '/dashboard';
-        })
-        .catch((err: any) => {
-          if (err?.cancelled) {
-            setError('Verification cancelled by user.');
-          } else {
-            setError(err?.message || 'Identity verification failed.');
-          }
+    try {
+      if (isLogin) {
+        // ── Sign In Logic (SQLite API) ──────────────────────────────────────────────
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
         });
+
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.message || 'Invalid credentials.');
+          return;
+        }
+
+        // Log in
+        localStorage.setItem('current_user', JSON.stringify({
+          email: data.email,
+          name: data.name,
+          role: data.role,
+          isVerified: data.isVerified
+        }));
+        
+        window.location.href = '/dashboard';
+      } else {
+        // ── Sign Up Logic (SQLite API) ────────────────────
+        const res = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, name, role })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.message || 'Failed to sign up.');
+          return;
+        }
+        
+        // Log user in
+        localStorage.setItem('current_user', JSON.stringify({
+          email: data.email,
+          name: data.name,
+          role: data.role,
+          isVerified: false
+        }));
+
+        window.location.href = '/dashboard';
+      }
+    } catch (err: any) {
+      setError('Network connection error. Is the server running?');
     }
   };
 
@@ -197,7 +189,7 @@ export default function AuthPage() {
             type="submit"
             className="w-full py-4 mt-6 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg hover:shadow-purple-500/10 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>{isLogin ? 'Sign In' : 'Proceed to Identity Scan'}</span>
+            <span>{isLogin ? 'Sign In' : 'Sign Up'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>

@@ -1,7 +1,8 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Plus, Copy, Receipt, Send, ShieldAlert, Sparkles, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Plus, Copy, Receipt, Send, ShieldAlert, Sparkles, RefreshCw, CheckCircle2, ShoppingBag, User } from 'lucide-react';
 import { StatementModal } from './StatementModal';
+import { GIG_PRESETS } from './FreelancerPanel';
 
 // Web Crypto HMAC-SHA256 Helper
 async function generateHmac(body: string, secret: string): Promise<string> {
@@ -25,12 +26,15 @@ async function generateHmac(body: string, secret: string): Promise<string> {
 
 interface BuyerPanelProps {
   currentUser: { email: string; name: string; role: string };
+  activeTab: 'dashboard' | 'marketplace' | 'my-gigs' | 'settings';
+  setActiveTab: (tab: 'dashboard' | 'marketplace' | 'my-gigs' | 'settings') => void;
 }
 
-export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser }) => {
+export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, setActiveTab }) => {
   const [agreements, setAgreements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [gigs, setGigs] = useState<any[]>([]);
   
   // Form states
   const [title, setTitle] = useState('');
@@ -41,6 +45,8 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser }) => {
   // Ledger statement modal states
   const [selectedAgreementId, setSelectedAgreementId] = useState<string | null>(null);
   const [showStatement, setShowStatement] = useState(false);
+  const [releasingIds, setReleasingIds] = useState<Record<string, boolean>>({});
+  const [simAmounts, setSimAmounts] = useState<Record<string, string>>({});
 
   // Load created agreements from localStorage
   const loadAgreements = async () => {
@@ -81,9 +87,22 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser }) => {
     }
   };
 
+  const loadGigs = async () => {
+    try {
+      const res = await fetch('/api/gigs');
+      if (res.ok) {
+        const data = await res.json();
+        setGigs(data);
+      }
+    } catch (err) {
+      console.error('Failed to load marketplace gigs:', err);
+    }
+  };
+
   useEffect(() => {
     loadAgreements();
-  }, []);
+    loadGigs();
+  }, [activeTab]);
 
   const handleCreateAgreement = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,6 +207,7 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser }) => {
   const handleReleaseFunds = async (agreementId: string, milestoneId: string) => {
     if (!confirm('Are you sure you want to approve this milestone and release funds to the freelancer?')) return;
 
+    setReleasingIds(prev => ({ ...prev, [agreementId]: true }));
     try {
       const res = await fetch(`http://localhost:5000/escrow/agreements/${agreementId}/milestones/${milestoneId}/confirm`, {
         method: 'POST',
@@ -210,9 +230,126 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser }) => {
       await loadAgreements();
     } catch (err: any) {
       alert(`Payout failed: ${err.message}`);
+    } finally {
+      setReleasingIds(prev => ({ ...prev, [agreementId]: false }));
     }
   };
 
+  const handleClaimRefund = async (agreementId: string, excess: number) => {
+    if (!confirm(`Are you sure you want to reclaim your excess payment of ₦${excess.toLocaleString()} back from escrow?`)) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/escrow/agreements/${agreementId}/refund`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845',
+        },
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Refund request failed.');
+      }
+
+      const data = await res.json();
+      alert(data.message);
+      await loadAgreements();
+    } catch (err: any) {
+      alert(`Refund failed: ${err.message}`);
+    }
+  };
+
+  const handleOrderGig = (gig: any) => {
+    // 1. Populate states
+    setTitle(`Hire for: ${gig.name}`);
+    setFreelancerEmail(gig.freelancerEmail);
+    setAmount(gig.price.toString());
+    
+    // 2. Redirect back to dashboard panel
+    setActiveTab('dashboard');
+    
+    // 3. Scroll to top to focus on form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // If Marketplace Tab is selected
+  if (activeTab === 'marketplace') {
+    return (
+      <div className="space-y-10 animate-in fade-in duration-200">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1.5 flex items-center gap-2">
+            <ShoppingBag className="w-7 h-7 text-purple-500" />
+            <span>Marketplace Services</span>
+          </h1>
+          <p className="text-sm text-gray-400">
+            Browse service gigs published by verified Plica freelancers and hire instantly using Vouch protected escrow.
+          </p>
+        </div>
+
+        {gigs.length === 0 ? (
+          <div className="bg-[#0a0a0c] border border-white/5 rounded-3xl p-12 text-center text-gray-500 text-sm">
+            No service gigs listed in the marketplace yet.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {gigs.map((gig) => {
+              const preset = GIG_PRESETS.find(p => p.id === gig.presetId) || GIG_PRESETS[0];
+              return (
+                <div
+                  key={gig.id}
+                  className="bg-[#0a0a0c] border border-white/5 rounded-3xl overflow-hidden hover:border-purple-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between"
+                >
+                  {/* Card Illustration */}
+                  <div className={`h-28 bg-gradient-to-br ${preset.gradient} flex items-center justify-center text-4xl relative`}>
+                    <span>{preset.icon}</span>
+                    <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider text-white">
+                      {gig.serviceType}
+                    </div>
+                  </div>
+
+                  {/* Gig Info */}
+                  <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                    <div className="space-y-2">
+                      <h3 className="font-bold text-base text-white line-clamp-1">{gig.name}</h3>
+                      <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">{gig.description}</p>
+                      
+                      {/* Freelancer details */}
+                      <div className="flex items-center gap-2 pt-2 text-[10px] text-gray-500">
+                        <div className="w-4 h-4 rounded-full bg-white/5 flex items-center justify-center text-purple-400">
+                          <User className="w-2.5 h-2.5" />
+                        </div>
+                        <span className="truncate" title={`${gig.freelancerName} (${gig.freelancerEmail})`}>
+                          By: {gig.freelancerName}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-white/5 flex flex-col gap-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-gray-500 font-mono">Rate starts at</span>
+                        <span className="font-bold text-purple-400 font-mono text-base">₦{gig.price.toLocaleString()}</span>
+                      </div>
+                      
+                      <button
+                        onClick={() => handleOrderGig(gig)}
+                        className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Order Gig / Secure Escrow</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Standard Escrow / Dashboard tab
   return (
     <div className="space-y-10 text-white font-sans">
       {/* Create Project Section */}
@@ -299,8 +436,10 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {agreements.map((agreement) => {
               const shortfall = Math.max(0, agreement.totalAmount - (agreement.amountReceived ?? 0));
+              const excess = Math.max(0, (agreement.amountReceived ?? 0) - agreement.totalAmount);
               const milestone = agreement.milestones?.[0];
-              const isDisbursed = milestone?.status === 'DISBURSED';
+              const isDisbursed = milestone?.status === 'DISBURSED' || agreement.status === 'DISBURSED';
+              const isReleased = milestone?.buyerConfirmed === true;
 
               return (
                 <div
@@ -343,6 +482,12 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser }) => {
                           <span className="font-bold font-mono text-amber-500">₦{shortfall.toLocaleString()}</span>
                         </div>
                       )}
+                      {excess > 0 && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-500 text-red-400">Excess Overpayment:</span>
+                          <span className="font-bold font-mono text-red-400">₦{excess.toLocaleString()}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Virtual Account display for funding */}
@@ -373,6 +518,58 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser }) => {
                         </div>
                       </div>
                     )}
+                    {/* Nomba Webhook Simulator for custom transfers */}
+                    {!isDisbursed && agreement.nombaVirtualAccountNo && (
+                      <div className="bg-black/35 border border-white/5 rounded-2xl p-4 space-y-3 mb-2 mt-4">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-purple-400 font-bold tracking-wide uppercase flex items-center gap-1">
+                            <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                            Nomba Webhook Simulator
+                          </span>
+                          <span className="text-[10px] text-gray-500 font-mono">Transfer Sandbox</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <span className="absolute left-3 top-2 text-xs text-gray-500 font-bold">₦</span>
+                            <input
+                              type="number"
+                              placeholder="Transfer amount..."
+                              value={simAmounts[agreement.id] || ''}
+                              onChange={(e) => setSimAmounts({ ...simAmounts, [agreement.id]: e.target.value })}
+                              className="w-full pl-7 pr-3 py-2 bg-black/60 border border-white/10 rounded-xl text-white font-mono text-sm focus:outline-none focus:border-purple-500/50"
+                            />
+                          </div>
+                          <button
+                            onClick={() => {
+                              const amt = parseFloat(simAmounts[agreement.id] || '0');
+                              if (amt <= 0 || isNaN(amt)) {
+                                alert('Please enter a valid transfer amount.');
+                                return;
+                              }
+                              handleSimulatePayment(agreement, amt);
+                            }}
+                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                          >
+                            Send
+                          </button>
+                        </div>
+                        <div className="flex gap-1.5 justify-between">
+                          <button
+                            onClick={() => handleSimulatePayment(agreement, shortfall)}
+                            disabled={shortfall <= 0}
+                            className="text-[10px] bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none text-gray-400 hover:text-white px-2 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex-1 text-center"
+                          >
+                            Pay Shortfall (₦{shortfall.toLocaleString()})
+                          </button>
+                          <button
+                            onClick={() => handleSimulatePayment(agreement, agreement.totalAmount + 5000)}
+                            className="text-[10px] bg-red-950/10 border border-red-500/10 hover:bg-red-950/20 text-red-400 px-2 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex-1 text-center"
+                          >
+                            Overpay (+₦5,000)
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions footer */}
@@ -389,37 +586,29 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser }) => {
                       <span>Ledger</span>
                     </button>
 
-                    {/* Simulate Payment shortcut */}
-                    {shortfall > 0 && (
-                      <div className="flex gap-1 flex-1">
-                        <button
-                          onClick={() => handleSimulatePayment(agreement)}
-                          className="flex-1 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-sm transition-colors cursor-pointer"
-                        >
-                          Fund
-                        </button>
-                        <button
-                          onClick={() => handleSimulatePayment(agreement, agreement.totalAmount + 500)}
-                          className="px-3 bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-500/20 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                          title="Simulate Overpayment of +₦500"
-                        >
-                          +500
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Release funds to seller */}
-                    {shortfall === 0 && !isDisbursed && (
+                    {/* Reclaim excess overpayment button */}
+                    {agreement.status === 'OVERFUNDED' && excess > 0 && (
                       <button
-                        onClick={() => handleReleaseFunds(agreement.id, milestone.id)}
-                        className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                        onClick={() => handleClaimRefund(agreement.id, excess)}
+                        className="flex-1 py-3 bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-500/20 font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-1 cursor-pointer"
                       >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Release Payout</span>
+                        <span>Reclaim ₦{excess.toLocaleString()} Excess</span>
                       </button>
                     )}
 
-                    {isDisbursed && (
+                    {/* Release funds to seller */}
+                    {shortfall === 0 && !isDisbursed && !isReleased && (
+                      <button
+                        onClick={() => handleReleaseFunds(agreement.id, milestone.id)}
+                        disabled={releasingIds[agreement.id]}
+                        className={`flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-800/40 disabled:text-green-500 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed`}
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>{releasingIds[agreement.id] ? 'Releasing Payout...' : 'Release Payout'}</span>
+                      </button>
+                    )}
+
+                    {(isDisbursed || isReleased) && (
                       <div className="flex-1 py-3 bg-blue-950/20 text-blue-400 border border-blue-500/10 rounded-xl text-sm font-semibold text-center flex items-center justify-center gap-1">
                         <CheckCircle2 className="w-4 h-4" />
                         <span>Settled to Freelancer</span>
