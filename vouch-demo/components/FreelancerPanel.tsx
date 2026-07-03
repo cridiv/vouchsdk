@@ -10,31 +10,31 @@ interface FreelancerPanelProps {
 }
 
 export const GIG_PRESETS = [
-  { 
-    id: 'dev', 
-    name: 'Software Development', 
-    icon: '💻', 
+  {
+    id: 'dev',
+    name: 'Software Development',
+    icon: '💻',
     gradient: 'from-[#6366f1] to-[#a855f7]',
     fallbackImage: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=400&auto=format&fit=crop'
   },
-  { 
-    id: 'design', 
-    name: 'UI/UX Design', 
-    icon: '🎨', 
+  {
+    id: 'design',
+    name: 'UI/UX Design',
+    icon: '🎨',
     gradient: 'from-[#ec4899] to-[#f43f5e]',
     fallbackImage: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?q=80&w=400&auto=format&fit=crop'
   },
-  { 
-    id: 'writing', 
-    name: 'Content Writing', 
-    icon: '✍️', 
+  {
+    id: 'writing',
+    name: 'Content Writing',
+    icon: '✍️',
     gradient: 'from-[#f97316] to-[#eab308]',
     fallbackImage: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?q=80&w=400&auto=format&fit=crop'
   },
-  { 
-    id: 'marketing', 
-    name: 'Growth Marketing', 
-    icon: '🚀', 
+  {
+    id: 'marketing',
+    name: 'Growth Marketing',
+    icon: '🚀',
     gradient: 'from-[#06b6d4] to-[#3b82f6]',
     fallbackImage: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=400&auto=format&fit=crop'
   },
@@ -44,7 +44,7 @@ export const FreelancerPanel: React.FC<FreelancerPanelProps> = ({ currentUser, a
   const [agreements, setAgreements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [myGigs, setMyGigs] = useState<any[]>([]);
-  
+
   // Gig Form State
   const [gigName, setGigName] = useState('');
   const [gigDescription, setGigDescription] = useState('');
@@ -59,44 +59,29 @@ export const FreelancerPanel: React.FC<FreelancerPanelProps> = ({ currentUser, a
 
   const loadAgreements = async () => {
     setLoading(true);
-    const keys = Object.keys(localStorage).filter((k) => k.startsWith('agreement_'));
-    const localIds = keys.map((k) => k.replace('agreement_', ''));
-
-    if (localIds.length === 0) {
-      setAgreements([]);
-      setLoading(false);
-      return;
-    }
-
     try {
-      const fetchPromises = localIds.map(async (id) => {
-        try {
-          const res = await fetch(`http://localhost:5000/escrow/agreements/${id}`, {
-            method: 'GET',
-            headers: {
-              'x-api-key': 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845',
-            },
-          });
-          if (res.ok) {
-            return await res.json();
-          }
-        } catch {}
-        // Fallback to local cache
-        const cached = localStorage.getItem(`agreement_${id}`);
-        return cached ? JSON.parse(cached) : null;
-      });
+      // Query the backend directly for all agreements where this user is the seller.
+      // This works regardless of localStorage state — critical for freelancers who
+      // log in on a fresh session and have no localStorage agreement keys.
+      const res = await fetch(
+        `http://localhost:5000/escrow/agreements?externalUserId=${encodeURIComponent(currentUser.email)}&role=seller`,
+        {
+          method: 'GET',
+          headers: {
+            'x-api-key': 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845',
+          },
+        }
+      );
 
-      const results = await Promise.all(fetchPromises);
-      
-      // Filter agreements where this freelancer is the seller (sellerExternalId)
-      const freelancerJobs = results
-        .filter(Boolean)
-        .filter((a: any) => a.sellerExternalId === currentUser.email)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        
-      setAgreements(freelancerJobs);
+      if (res.ok) {
+        const data = await res.json();
+        setAgreements(data);
+      } else {
+        setAgreements([]);
+      }
     } catch (err) {
       console.error('Error loading freelancer agreements:', err);
+      setAgreements([]);
     } finally {
       setLoading(false);
     }
@@ -170,7 +155,7 @@ export const FreelancerPanel: React.FC<FreelancerPanelProps> = ({ currentUser, a
   if (activeTab === 'my-gigs') {
     return (
       <div className="space-y-10 animate-in fade-in duration-200">
-        
+
         {/* Create Gig form */}
         <div className="bg-[#0a0a0c] border border-white/5 rounded-3xl p-6 sm:p-8 relative">
           <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
@@ -180,7 +165,7 @@ export const FreelancerPanel: React.FC<FreelancerPanelProps> = ({ currentUser, a
 
           <form onSubmit={handleCreateGig} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
+
               <div className="space-y-1.5">
                 <label className="text-xs text-gray-500 font-semibold uppercase tracking-wider block">Service Name (Title)</label>
                 <input
@@ -236,11 +221,10 @@ export const FreelancerPanel: React.FC<FreelancerPanelProps> = ({ currentUser, a
                         setSelectedPreset(preset.id);
                         setGigCategory(preset.name);
                       }}
-                      className={`h-12 rounded-xl flex items-center justify-center text-xl transition-all cursor-pointer border ${
-                        selectedPreset === preset.id
+                      className={`h-12 rounded-xl flex items-center justify-center text-xl transition-all cursor-pointer border ${selectedPreset === preset.id
                           ? 'border-purple-500 bg-purple-500/10 scale-105 shadow-md shadow-purple-500/5'
                           : 'border-white/5 bg-[#111115] opacity-60 hover:opacity-100'
-                      }`}
+                        }`}
                       title={preset.name}
                     >
                       {preset.icon}
@@ -360,13 +344,12 @@ export const FreelancerPanel: React.FC<FreelancerPanelProps> = ({ currentUser, a
                       </h3>
                       <span className="text-xs text-gray-500 font-mono block mt-0.5">Client: {agreement.buyerExternalId}</span>
                     </div>
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase ${
-                      agreement.status === 'FUNDED' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
-                      agreement.status === 'PARTIAL' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                      agreement.status === 'OVERFUNDED' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                      agreement.status === 'DISBURSED' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                      'bg-gray-800 text-gray-400'
-                    }`}>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase ${agreement.status === 'FUNDED' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                        agreement.status === 'PARTIAL' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                          agreement.status === 'OVERFUNDED' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                            agreement.status === 'DISBURSED' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                              'bg-gray-800 text-gray-400'
+                      }`}>
                       {agreement.status}
                     </span>
                   </div>
@@ -377,7 +360,7 @@ export const FreelancerPanel: React.FC<FreelancerPanelProps> = ({ currentUser, a
                       <span className="text-gray-500">Milestone Payout:</span>
                       <span className="font-bold font-mono">₦{agreement.totalAmount.toLocaleString()}</span>
                     </div>
-                    
+
                     <div className="flex items-center gap-1.5 pt-2.5 border-t border-white/5">
                       {shortfall > 0 ? (
                         <div className="flex items-center gap-1.5 text-xs text-amber-500">

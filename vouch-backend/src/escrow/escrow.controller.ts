@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiKeyGuard } from '../developer/guard/api-key.guard.js';
 import { CurrentDeveloper } from '../common/decorators/current-developer.decorator.js';
 import type { Developer } from '@prisma/client';
@@ -38,6 +38,16 @@ export class EscrowController {
     @CurrentDeveloper() developer: Developer,
   ) {
     return this.escrowService.getAgreement(id, developer);
+  }
+
+  @Get('agreements')
+  @UseGuards(ApiKeyGuard)
+  async listAgreements(
+    @Query('externalUserId') externalUserId: string,
+    @Query('role') role: 'buyer' | 'seller',
+    @CurrentDeveloper() developer: Developer,
+  ) {
+    return this.escrowService.listAgreementsByUser(externalUserId, role, developer);
   }
 
   @Get('agreements/:id/statement')

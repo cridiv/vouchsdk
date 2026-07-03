@@ -180,11 +180,19 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
     };
 
     const rawBody = JSON.stringify(payload);
+
+    // Route through the public ngrok URL if configured — this makes the request
+    // visible in the ngrok inspector at 127.0.0.1:4040, proving the live webhook
+    // path end-to-end. Falls back to localhost for offline use.
+    const webhookBase =
+      process.env.NEXT_PUBLIC_NOMBA_WEBHOOK_URL?.replace(/\/$/, '') ||
+      'http://localhost:5000';
+    const webhookUrl = `${webhookBase}/escrow/webhooks/nomba`;
     
     try {
       const signature = await generateHmac(rawBody, 'NombaHackathon2026');
 
-      const res = await fetch('http://localhost:5000/escrow/webhooks/nomba', {
+      const res = await fetch(webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -524,9 +532,9 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
                         <div className="flex justify-between items-center text-xs">
                           <span className="text-purple-400 font-bold tracking-wide uppercase flex items-center gap-1">
                             <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-                            Nomba Webhook Simulator
+                            Nomba Webhook
                           </span>
-                          <span className="text-[10px] text-gray-500 font-mono">Transfer Sandbox</span>
+                          <span className="text-[10px] text-gray-500 font-mono">Live Transfer</span>
                         </div>
                         <div className="flex gap-2">
                           <div className="relative flex-1">

@@ -503,6 +503,43 @@ export class EscrowService {
     return agreement;
   }
 
+  async listAgreementsByUser(externalUserId: string, role: 'buyer' | 'seller', developer: Developer) {
+    this.logger.log(`Listing agreements for ${role} ${externalUserId} under developer ${developer.id}`);
+
+    const where =
+      role === 'seller'
+        ? { developerId: developer.id, sellerExternalId: externalUserId }
+        : { developerId: developer.id, buyerExternalId: externalUserId };
+
+    const agreements = await this.prisma.agreement.findMany({
+      where,
+      include: { milestones: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return agreements.map((a) => ({
+      id: a.id,
+      agreementId: a.id,
+      status: a.status,
+      totalAmount: a.totalAmount,
+      amountReceived: a.amountReceived,
+      currency: a.currency,
+      nombaVirtualAccountNo: a.nombaVirtualAccountNo,
+      buyerExternalId: a.buyerExternalId,
+      sellerExternalId: a.sellerExternalId,
+      createdAt: a.createdAt,
+      milestones: a.milestones.map((m) => ({
+        id: m.id,
+        title: m.title,
+        amount: m.amount,
+        status: m.status,
+        buyerConfirmed: m.buyerConfirmed,
+        sellerConfirmed: m.sellerConfirmed,
+        disbursedAt: m.disbursedAt,
+      })),
+    }));
+  }
+
   async getStatement(agreementId: string, developer: Developer) {
     this.logger.log(`Generating statement for agreement ${agreementId} for developer ${developer.id}`);
 
