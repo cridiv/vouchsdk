@@ -2,23 +2,23 @@
     "rewrites": [
         {
             "source": "/_mintlify/:path*",
-            "destination": "https://cridiv.mintlify.app/_mintlify/:path*"
+            "destination": "https://cridiv.mintlify.site/_mintlify/:path*"
         },
         {
             "source": "/api/request",
-            "destination": "https://cridiv.mintlify.app/_mintlify/api/request"
+            "destination": "https://cridiv.mintlify.site/_mintlify/api/request"
         },
         {
             "source": "/mintlify-assets/:path*",
-            "destination": "https://cridiv.mintlify.app/mintlify-assets/:path*"
+            "destination": "https://cridiv.mintlify.site/mintlify-assets/:path*"
         },
         {
             "source": "/docs",
-            "destination": "https://cridiv.mintlify.app/docs"
+            "destination": "https://cridiv.mintlify.site/docs"
         },
         {
             "source": "/docs/:path*",
-            "destination": "https://cridiv.mintlify.app/docs/:path*"
+            "destination": "https://cridiv.mintlify.site/docs/:path*"
         }
     ]
 }
