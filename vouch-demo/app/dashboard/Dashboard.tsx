@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { LogOut, User, RefreshCw, Briefcase, ShoppingBag, Plus, Settings, Shield, Menu, X, CheckCircle, ShieldAlert } from 'lucide-react';
 import { BuyerPanel } from '@/components/BuyerPanel';
 import { FreelancerPanel } from '@/components/FreelancerPanel';
-import { Vouch } from '@/lib/vouch-sdk/vouch';
+import { Vouch } from 'vouch-sdk';
 import Image from 'next/image';
 
 const vouch = new Vouch(process.env.NEXT_PUBLIC_VOUCH_API_KEY || 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845', {

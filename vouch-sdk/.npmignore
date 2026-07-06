@@ -1,0 +1,9 @@
+# Ignore test files
+test.ts
+
+# Ignore raw documentation files
+vouch_sdk_documentation.md
+
+# Ignore configuration files
+tsconfig.json
+.gitignore
