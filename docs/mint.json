@@ -17,8 +17,8 @@
   },
   "topbarLinks": [
     {
-      "name": "Marketplace Demo",
-      "url": "http://localhost:3000"
+      "name": "Live Demo",
+      "url": "https://plica-demo.vercel.app"
     }
   ],
   "topbarCtaButton": {
@@ -40,6 +40,12 @@
         "sdk-reference/fraud",
         "sdk-reference/escrow",
         "sdk-reference/fingerprinting"
+      ]
+    },
+    {
+      "group": "Platform Internals",
+      "pages": [
+        "sdk-reference/webhook-events"
       ]
     }
   ],

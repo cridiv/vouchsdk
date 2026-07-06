@@ -1,0 +1,139 @@
+---
+title: "Webhook Events"
+description: "Nomba payment reconciliation, idempotency, and automatic overpayment refunds"
+---
+
+Vouch uses a **webhook-driven payment reconciliation** model. When a buyer deposits funds into a Nomba Virtual Account, Nomba fires a `virtual_account.funded` event to the backend. The backend validates, reconciles, and advances the escrow state machine automatically — no polling or manual confirmation required.
+
+---
+
+## Webhook Endpoint
+
+```
+POST /escrow/webhooks/nomba
+```
+
+This endpoint is registered in the Nomba dashboard and receives all `virtual_account.funded` events scoped to your sub-account.
+
+---
+
+## Request Lifecycle
+
+Every incoming webhook is processed in a strict two-phase sequence to ensure reliability under high load:
+
+```
+Nomba HTTP POST
+  │
+  ├─ 1. Check nomba-signature header present     → 401 if missing
+  ├─ 2. HMAC-SHA256(rawBody, WEBHOOK_SECRET)     → 401 if mismatch
+  ├─ 3. JSON.parse(rawBody)                      → 400 if malformed
+  ├─ 4. res.sendStatus(200)                      ← ACK immediately
+  └─ 5. setImmediate(() => reconcile(event))     ← async, non-blocking
+```
+
+The immediate `200` ACK prevents Nomba from retrying due to slow database operations.
+
+---
+
+## Signature Verification
+
+Every request is signed by Nomba using **HMAC-SHA256** over the raw request body. The backend re-computes the signature and compares it against the `nomba-signature` header:
+
+```typescript
+const expected = crypto
+  .createHmac('sha256', process.env.NOMBA_WEBHOOK_SECRET)
+  .update(rawBody)  // raw Buffer — not parsed JSON
+  .digest('hex');
+
+if (signature !== expected) return res.status(401).json({ error: 'Invalid signature' });
+```
+
+> [!IMPORTANT]
+> The signature is computed over the **raw bytes** of the request body. The `express.raw()` middleware must be applied to this route to prevent body parsing from corrupting the byte order.
+
+---
+
+## Reconciliation Logic
+
+Once the signature passes, the reconciler runs asynchronously:
+
+### 1. Match Agreement
+The webhook payload contains `accountNumber` (the NUBAN that was credited). The reconciler looks up the `Agreement` record whose `nombaVirtualAccountNo` matches.
+
+### 2. Idempotency Guard
+Each Nomba event carries a unique `requestId`. This is stored as `nombaReference` on the `NombaTransfer` table, which has a `@unique` constraint. If Nomba retries the same event, the duplicate `create` throws a **`P2002` Prisma unique constraint error**, which is silently swallowed — preventing double-credit.
+
+### 3. Derive Status
+The reconciler adds the incoming payment to the running `amountReceived` total and derives the new status:
+
+| Condition | New Status |
+| :--- | :---: |
+| `amountReceived < totalAmount` | `PARTIAL` |
+| `amountReceived >= totalAmount` | `FUNDED` |
+| `amountReceived > totalAmount × 1.01` | `OVERFUNDED` |
+| Agreement already `FROZEN` or `DISBURSED` | Status unchanged |
+
+---
+
+## Partial Payments
+
+If a buyer sends funds in multiple transfers, each `virtual_account.funded` webhook increments `amountReceived` incrementally. The agreement stays in `PARTIAL` status until the running total meets or exceeds `totalAmount`. No intervention is required.
+
+---
+
+## Overpayment & Automatic Refunds
+
+When `amountReceived > totalAmount × 1.01` (more than 1% over), the system:
+
+1. Sets agreement to `OVERFUNDED`
+2. Computes `excess = amountReceived - totalAmount`
+3. Reads the sender's bank details from the webhook payload
+4. Calls `NombaService.disburse()` immediately to return the excess
+5. Logs the event as `OVERPAYMENT_FLAGGED` in the developer audit log
+
+```typescript
+// Automatic refund payload
+{
+  accountNumber: senderAccount,
+  bankCode: senderBankCode,
+  amount: excess,
+  narration: `Refund Excess for Vouch Agreement ${agreementId}`,
+  reference: `RFND-${requestId}-${timestamp}`,
+}
+```
+
+> [!NOTE]
+> If the webhook payload does not include the sender's `senderAccount` or `senderBankCode`, the refund is skipped and the failure is recorded in the audit log with `reason: 'Insufficient sender bank details'`.
+
+---
+
+## Events Emitted
+
+After successful reconciliation, the webhook controller emits internal NestJS events to trigger downstream processing:
+
+| Event | When Emitted | Effect |
+| :--- | :--- | :--- |
+| `payment.confirmed` | Status is `FUNDED` or `OVERFUNDED` | EscrowService advances state machine to `FUNDED` |
+
+---
+
+## Developer Audit Log Events
+
+Every reconciliation writes a structured entry to the `DeveloperLog` table:
+
+| `eventType` | Trigger |
+| :--- | :--- |
+| `RECONCILIATION_MATCHED` | Payment matched and `amountReceived` updated successfully |
+| `OVERPAYMENT_FLAGGED` | `amountReceived` exceeded tolerance; auto-refund attempted |
+| `ESCROW_FUNDED` | Agreement fully funded and state machine advanced |
+
+---
+
+## Supported Event Types
+
+Currently, only one Nomba event type is processed. All others are acknowledged and ignored.
+
+| Event Type | Handled |
+| :--- | :---: |
+| `virtual_account.funded` | ✅ |
+| All other types | Logged and ignored |

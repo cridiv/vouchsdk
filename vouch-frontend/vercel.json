@@ -1,0 +1,16 @@
+{
+    "rewrites": [
+        {
+            "source": "/_mintlify/:path*",
+            "destination": "https://cridiv.mintlify.app/_mintlify/:path*"
+        },
+        {
+            "source": "/api/request",
+            "destination": "https://cridiv.mintlify.app/_mintlify/api/request"
+        },
+        {
+            "source": "/docs/:path*",
+            "destination": "https://cridiv.mintlify.app/docs/:path*"
+        }
+    ]
+}
