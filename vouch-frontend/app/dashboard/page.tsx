@@ -221,13 +221,13 @@ const DashboardPage = () => {
             >
               Keys
             </button>
-            <Link
+            <a
               href="/docs"
               target="_blank"
               className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-transparent hover:bg-white/5 text-gray-400 hover:text-gray-200 px-4 text-sm font-mono transition-all"
             >
               Docs <ExternalLink className="w-3.5 h-3.5 opacity-60" />
-            </Link>
+            </a>
           </div>
         </div>
       </div>

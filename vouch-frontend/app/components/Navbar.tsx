@@ -35,9 +35,9 @@ const Navbar = () => {
             <Link href="/#integrations" className="hover:text-white transition">
               Integrations
             </Link>
-            <Link href="/docs" className="hover:text-white transition">
+            <a href="/docs" className="hover:text-white transition">
               Docs
-            </Link>
+            </a>
           </div>
 
           {/* Right: Docs, CTA & Mobile Toggle */}
@@ -103,13 +103,13 @@ const Navbar = () => {
             >
               Integrations
             </Link>
-            <Link
+            <a
               href="/docs"
               onClick={toggleMenu}
               className="text-4xl font-bold tracking-tight hover:text-[#58A0B4] transition"
             >
               Docs
-            </Link>
+            </a>
             <Link
               href="/github"
               onClick={toggleMenu}
