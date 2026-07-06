@@ -176,7 +176,11 @@ export class Vouch {
   escrow = {
     create: async (params: CreateAgreementParams): Promise<AgreementResponse> => {
       const res = await this.http.post<AgreementResponse>('/escrow/agreements', params);
-      return res.data;
+      const data = res.data;
+      if (data && !data.id && data.agreementId) {
+        data.id = data.agreementId;
+      }
+      return data;
     },
 
     assess: async (
@@ -211,7 +215,11 @@ export class Vouch {
 
     status: async (agreementId: string): Promise<AgreementResponse> => {
       const res = await this.http.get<AgreementResponse>(`/escrow/agreements/${agreementId}`);
-      return res.data;
+      const data = res.data;
+      if (data && !data.id && data.agreementId) {
+        data.id = data.agreementId;
+      }
+      return data;
     },
   };
 }
