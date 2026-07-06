@@ -1,0 +1,186 @@
+---
+title: "Escrow & Milestones"
+description: "Automated multi-party payment management with Nomba virtual accounts, state-machine enforcement, and milestone disbursement"
+---
+
+The `vouch.escrow` module is the core product of the Vouch Trust Platform. It manages the complete lifecycle of a binding payment agreement between a buyer and a seller — from fund collection through Nomba virtual bank accounts, to milestone-gated disbursement with integrated fraud scoring.
+
+---
+
+## 1. Create Agreement
+
+Creates a new escrow agreement atomically. This operation creates a `PlatformUser` record for both parties, validates both identities are verified, provisions a **Nomba Virtual Account** for fund collection, and persists all records in a single transaction.
+
+```typescript
+const agreement = await vouch.escrow.create({
+  buyerExternalId: 'buyer_user_123',
+  sellerExternalId: 'seller_user_456',
+  totalAmount: 500000,
+  currency: 'NGN',
+  buyerEmail: 'buyer@acme.com',
+  buyerName: 'Jane Buyer',
+  milestones: [
+    { title: 'Sprint 1 — System Design', amount: 200000 },
+    { title: 'Sprint 2 — Code Delivery', amount: 300000 }
+  ]
+});
+
+console.log(agreement.nombaVirtualAccountNo); // "9988771122"
+console.log(agreement.nombaBank);             // "Nomba MFB"
+```
+
+### Validation Rules
+
+> [!IMPORTANT]
+> Both buyer and seller must have completed identity verification (`identityVerified: true`) before an agreement can be created. The API will return a `400 Bad Request` if either party has not passed KYC.
+
+The server also enforces **milestone sum integrity**: the sum of all milestone amounts must equal `totalAmount` exactly. Any discrepancy is rejected immediately.
+
+### Parameters: `CreateAgreementParams`
+
+| Field | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `buyerExternalId` | `string` | Yes | Buyer's unique ID on your platform. |
+| `sellerExternalId` | `string` | Yes | Seller's unique ID on your platform. |
+| `totalAmount` | `number` | Yes | Total funds required. Must equal sum of all milestone amounts. |
+| `currency` | `string` | No | Currency code. Defaults to `'NGN'`. |
+| `buyerEmail` | `string` | No | Buyer's email for audit records. |
+| `buyerName` | `string` | No | Used as the account holder name on the Nomba Virtual Account. |
+| `milestones` | `MilestoneInput[]` | Yes | One or more milestone definitions. |
+
+### Response
+
+```typescript
+{
+  agreementId: "agr_clx8f7k2z000108l4...",
+  status: "PENDING",
+  totalAmount: 500000,
+  currency: "NGN",
+  nombaVirtualAccountNo: "9988771122",   // NUBAN to display to buyer
+  nombaBank: "Nomba MFB",
+  buyerExternalId: "buyer_user_123",
+  sellerExternalId: "seller_user_456",
+  createdAt: "2026-07-06T10:00:00.000Z",
+  milestones: [
+    { id: "ms_abc", title: "Sprint 1 — System Design", amount: 200000, status: "PENDING" },
+    { id: "ms_def", title: "Sprint 2 — Code Delivery", amount: 300000, status: "PENDING" }
+  ]
+}
+```
+
+---
+
+## 2. Payment Reconciliation (Webhook-Driven)
+
+**You do not call any payment confirmation method manually.** When the buyer deposits funds into the Nomba Virtual Account, Nomba fires a `virtual_account.funded` webhook to the backend. The system processes it as follows:
+
+### Reconciliation Flow
+
+```
+Nomba Webhook (POST /escrow/webhooks/nomba)
+  │
+  ├─ 1. Validate HMAC-SHA256 signature → 401 if mismatch
+  ├─ 2. Parse raw body → 400 if malformed JSON
+  ├─ 3. res.sendStatus(200) ← ACK immediately
+  └─ 4. setImmediate(() => reconcile(event)) ← async, non-blocking
+        │
+        ├─ Match virtual account number → lookup Agreement in DB
+        ├─ Check nombaReference uniqueness → idempotency guard (P2002)
+        ├─ Create NombaTransfer record (amount, sender details)
+        ├─ Derive new Agreement status (see table below)
+        ├─ Trigger automatic excess refund if OVERFUNDED
+        └─ Emit `payment.confirmed` event → state machine advances
+```
+
+### Idempotency
+
+Every Nomba event carries a unique `requestId`. This is stored on the `NombaTransfer` record as `nombaReference`, which has a `@unique` constraint. If Nomba retries a webhook (common in production), the duplicate `create` call throws a `P2002` unique constraint error which is **silently swallowed** — preventing duplicate credit.
+
+---
+
+## 3. Payment Status States
+
+The system derives agreement status based on cumulative `amountReceived` vs `totalAmount` after each webhook event:
+
+| Status | Trigger Condition | Description |
+| :--- | :--- | :--- |
+| `PENDING` | Agreement created | Awaiting first payment. |
+| `PARTIAL` | `amountReceived < totalAmount` | Partial payment received. Waiting for buyer to complete. |
+| `FUNDED` | `amountReceived >= totalAmount` | Full funds confirmed. Work can begin. |
+| `OVERFUNDED` | `amountReceived > totalAmount × 1.01` | Buyer overpaid by more than 1% tolerance. Automatic refund triggered. |
+| `IN_PROGRESS` | First milestone disbursed | At least one milestone has been paid out. |
+| `DISBURSED` | All milestones disbursed | Escrow fully settled. Terminal state. |
+| `FROZEN` | Fraud check failed | Agreement locked by a fraud signal. Terminal state. |
+| `REFUNDED` | Reserved for future use | Excess funds returned. |
+
+---
+
+## 4. Overpayment Handling
+
+When the reconciled `amountReceived` exceeds `totalAmount × 1.01`, the system:
+
+1. Sets agreement status to `OVERFUNDED`.
+2. Calculates the exact excess: `excess = amountReceived - totalAmount`.
+3. Looks up the sender's bank account from the webhook payload (`senderAccount`, `senderBankCode`).
+4. Calls `NombaService.disburse()` automatically to return the excess.
+5. Logs the event as `OVERPAYMENT_FLAGGED` in the developer audit log with full refund details.
+
+> [!NOTE]
+> Automatic refunds only execute if the sender's bank account number and bank code are present in the Nomba webhook payload. If the details are missing, the event is logged as a failed refund with `reason: 'Insufficient sender bank details'` and can be handled manually.
+
+---
+
+## 5. Assess Funding Risk
+
+Before the buyer pays, you can optionally call the fraud pre-assessment to get the virtual account details and a risk flag. If the result is `RED`, the escrow is frozen before the buyer is shown the bank account.
+
+```typescript
+const check = await vouch.escrow.assess('agr_abc123', {
+  externalUserId: 'buyer_user_123',
+  transactionAmount: 500000,
+});
+
+if (check.flag !== 'RED') {
+  console.log(`Pay to: ${check.nombaVirtualAccount.accountNumber} @ Nomba MFB`);
+}
+```
+
+---
+
+## 6. Confirm Milestone
+
+When both parties confirm a milestone is complete, the system:
+1. Records the confirmation flag for the confirming party.
+2. Runs a **final real-time fraud check** on the seller before disbursing.
+3. If the seller passes (`GREEN` or `AMBER`), calls `NombaService.disburse()` to execute a live bank transfer.
+4. Updates the milestone status to `DISBURSED`.
+5. If all milestones are disbursed, transitions the agreement to `DISBURSED`.
+
+```typescript
+await vouch.escrow.confirm(
+  'agr_abc123',          // Agreement ID
+  'ms_abc',              // Milestone ID
+  'buyer_user_123',      // Confirming party external ID
+);
+```
+
+> [!CAUTION]
+> Milestone confirmation requires `sellerAccountNumber` and `sellerBankCode` to be provided. Missing these fields will result in a `400` error halting disbursement.
+
+---
+
+## 7. Escrow State Machine
+
+All status transitions are enforced by a strict state machine. Invalid transitions (e.g., jumping from `PENDING` directly to `DISBURSED`) throw a `400 Bad Request`.
+
+| From | Allowed Transitions |
+| :--- | :--- |
+| `PENDING` | `PARTIAL`, `FUNDED`, `OVERFUNDED`, `FROZEN` |
+| `PARTIAL` | `PARTIAL`, `FUNDED`, `OVERFUNDED`, `FROZEN` |
+| `FUNDED` | `OVERFUNDED`, `IN_PROGRESS`, `COMPLETED`, `DISBURSED`, `FROZEN` |
+| `OVERFUNDED` | `IN_PROGRESS`, `COMPLETED`, `DISBURSED`, `FROZEN`, `REFUNDED` |
+| `IN_PROGRESS` | `COMPLETED`, `DISBURSED`, `FROZEN` |
+| `COMPLETED` | `DISBURSED`, `FROZEN` |
+| `DISBURSED` | *(terminal)* |
+| `REFUNDED` | *(terminal)* |
+| `FROZEN` | *(terminal)* |

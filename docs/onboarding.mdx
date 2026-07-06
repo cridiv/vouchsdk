@@ -1,0 +1,70 @@
+---
+title: "Onboarding & Setup"
+description: "Learn how to get started with the Vouch SDK in under 5 minutes"
+---
+
+## Installation
+
+Install the package to your project using your preferred package manager:
+
+<CodeGroup>
+```bash npm
+npm install vouch-sdk
+```
+
+```bash pnpm
+pnpm add vouch-sdk
+```
+
+```bash yarn
+yarn add vouch-sdk
+```
+</CodeGroup>
+
+---
+
+## 1. Get an API Key
+
+To authenticate requests to the Vouch API, you will need a Developer Secret API Key. 
+
+* Keys begin with the prefix `vouch_` (e.g. `vouch_live_8f9a2b3c4d5e...`).
+* You can get an API key via your developer portal, or programmatically via the provisioning endpoint if running a local test setup.
+
+> [!WARNING]
+> **Keep your API Key Secret:** Never publish your raw Vouch Secret API Key in client-side code (such as standard React/Next.js frontend bundles) as this exposes your developer account to misuse.
+
+---
+
+## 2. Environment Variables
+
+Store your Vouch credentials and base endpoints in your environment files (such as `.env` or `.env.local`):
+
+```env
+# The target API base URL (defaults to production)
+VOUCH_API_URL="https://vouch-fmql.onrender.com/v1"
+
+# Your developer secret API Key
+NEXT_PUBLIC_VOUCH_API_KEY="vouch_your_secret_api_key"
+```
+
+---
+
+## 3. Initialization
+
+Import the default `Vouch` class and initialize it with your API key. The SDK automatically reads `VOUCH_API_URL` from the environment if configured, otherwise, it points to the production server.
+
+```typescript
+import Vouch from 'vouch-sdk';
+
+// Initialize the SDK
+const vouch = new Vouch(process.env.NEXT_PUBLIC_VOUCH_API_KEY);
+```
+
+### Constructor Reference
+
+`new Vouch(apiKey: string, options?: { apiUrl?: string })`
+
+| Parameter | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `apiKey` | `string` | Yes | Your secret API key. |
+| `options.apiUrl` | `string` | No | Override the default base URL endpoint. Useful for local sandbox tests. |

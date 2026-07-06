@@ -1,0 +1,121 @@
+---
+title: "Fraud Intelligence"
+description: "Context-aware transaction scoring using ML ensemble, IP analysis, device profiling, and behavioral signals"
+---
+
+The `vouch.fraud` module evaluates transaction-level risk using a multi-layer pipeline. It combines real-time IP intelligence, device fingerprint matching, behavioral analysis, and Nomba payment signals before dispatching the full context to an ML scoring engine.
+
+---
+
+## `vouch.fraud.assess()`
+
+Performs a synchronous risk assessment returning an actionable flag and score.
+
+```typescript
+const assessment = await vouch.fraud.assess({
+  platformUserId: 'usr_abc123',
+  transactionAmount: 150000,
+  agreementId: 'agr_xyz789',           // optional — links to escrow context
+  simulateVpn: false,                  // sandbox testing only
+  simulateImpossibleTravel: false,     // sandbox testing only
+});
+
+switch (assessment.flag) {
+  case 'GREEN':  console.log('Proceed.'); break;
+  case 'AMBER':  console.log('Require step-up verification.'); break;
+  case 'RED':    console.warn('Block. Reason:', assessment.triggeredSignals); break;
+}
+```
+
+### Parameters: `FraudAssessParams`
+
+| Field | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `platformUserId` | `string` | Yes | The Vouch `PlatformUser` ID of the user being assessed. |
+| `transactionAmount` | `number` | Yes | Value of the transaction. |
+| `agreementId` | `string` | No | Binds the assessment to an escrow agreement, allowing Nomba transfer signals to be included in context. |
+| `simulateVpn` | `boolean` | No | Forces `is_vpn: true` and sets `ip_reputation_score: 12`. Available in `development` mode only. |
+| `simulateImpossibleTravel` | `boolean` | No | Forces `impossible_travel: true` and `location_distance_km: 9200`. Available in `development` mode only. |
+
+> [!NOTE]
+> The SDK collects and injects the `deviceFingerprint` (via FingerprintJS) automatically. You never need to provide this manually.
+
+---
+
+## Context Assembly Pipeline
+
+Before dispatching to the ML engine, the backend builds a rich `FraudContextDto` by aggregating data from four sub-services:
+
+| Layer | Service | What it provides |
+| :--- | :--- | :--- |
+| **IP Analysis** | `IpAnalysisService` | VPN/proxy detection, geolocation (country, city, lat/lng), IP reputation score |
+| **Behavioral** | `BehaviourService` | Account age, transaction count, time since last transaction, location distance from onboarding |
+| **Device** | `DeviceService` | Device fingerprint match, whether device was seen before, whether it matches onboarding device |
+| **Payment Signals** | `NombaTransfer` table | Sender name, payment reference, whether transfer amount matches agreement total |
+
+All four layers are assembled into a single payload and sent to the ML scoring engine (`POST /fraud/assess` on the AI Engine).
+
+---
+
+## Risk Flags
+
+| Flag | Score Range | Recommendation |
+| :---: | :---: | :--- |
+| 🟢 **`GREEN`** | `0 – 39` | `proceed` — Auto-approve. |
+| 🟡 **`AMBER`** | `40 – 69` | `require_additional_verification` — Prompt step-up. |
+| 🔴 **`RED`** | `70 – 100` | `block` — Reject immediately. |
+
+---
+
+## Triggered Signals
+
+The ML engine evaluates and returns signals explaining the score:
+
+| Signal | Source | Description |
+| :--- | :--- | :--- |
+| `vpn_detected` | IP Analysis | IP resolves to a commercial VPN or hosting datacenter. Sets `has_critical_flag = true`. |
+| `proxy_detected` | IP Analysis | Connection is routed through a proxy. Sets `has_critical_flag = true`. |
+| `impossible_travel` | Behavior | IP geolocation is physically unreachable from the onboarding location in the elapsed time. **Hard override: forces score to `85`, bypassing all other rules.** |
+| `new_device` | Device | Fingerprint not seen in previous sessions. |
+| `device_mismatch` | Device | Fingerprint differs from the one registered at onboarding. |
+| `new_account` | Behavior | Account is fewer than 7 days old. |
+| `high_value_transaction` | Behavior | Transaction amount exceeds ₦1,000,000. |
+| `rapid_transaction_velocity` | Behavior | Transaction within 1 hour of the previous transaction. |
+| `identity_not_verified` | User profile | Identity verification has not been completed. Sets `has_critical_flag = true`. |
+| `fraud_card_bin_detected` | Nomba Signals | Card BIN matches known fraud patterns. |
+
+### `has_critical_flag` Enforcement
+
+If any critical signal is triggered (`vpn_detected`, `proxy_detected`, `identity_not_verified`), the engine enforces a **floor score of 70** — guaranteeing a `RED` flag regardless of other mitigating signals.
+
+---
+
+## ML Engine Fallback
+
+If the ML service is unavailable or times out, the backend **defaults to `AMBER`** (score: 50) rather than failing open. This is a deliberate conservative default — never allowing a degraded ML service to silently approve high-risk transactions.
+
+```typescript
+// Fallback response when ML engine is down
+{
+  score: 50,
+  flag: 'AMBER',
+  category: 'Service Unavailable - Elevated Risk Default',
+  triggered_signals: ['ml_service_down'],
+  recommendation: 'require_additional_verification',
+}
+```
+
+---
+
+## Return Type: `FraudResultDto`
+
+```typescript
+interface FraudResultDto {
+  score: number;                                              // 0-100 composite risk score
+  flag: 'GREEN' | 'AMBER' | 'RED';
+  category: string;                                           // e.g. "Low Risk" | "High Risk"
+  triggered_signals: string[];                                // e.g. ["vpn_detected", "new_device"]
+  recommendation: 'proceed' | 'require_additional_verification' | 'block';
+  processing_time_ms: number;
+}
+```

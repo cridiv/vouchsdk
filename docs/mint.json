@@ -1,0 +1,49 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Vouch SDK",
+  "logo": {
+    "light": "https://raw.githubusercontent.com/cridiv/vouchsdk/main/vouch-demo/public/plica_logo.png",
+    "dark": "https://raw.githubusercontent.com/cridiv/vouchsdk/main/vouch-demo/public/plica_logo.png"
+  },
+  "favicon": "https://raw.githubusercontent.com/cridiv/vouchsdk/main/vouch-frontend/public/favicon_io/favicon-32x32.png",
+  "colors": {
+    "primary": "#6366f1",
+    "light": "#818cf8",
+    "dark": "#4338ca",
+    "anchors": {
+      "from": "#6366f1",
+      "to": "#a855f7"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "Marketplace Demo",
+      "url": "http://localhost:3000"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get API Key",
+    "url": "/onboarding"
+  },
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "onboarding"
+      ]
+    },
+    {
+      "group": "Core SDK Modules",
+      "pages": [
+        "sdk-reference/identity",
+        "sdk-reference/fraud",
+        "sdk-reference/escrow",
+        "sdk-reference/fingerprinting"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/cridiv/vouchsdk"
+  }
+}

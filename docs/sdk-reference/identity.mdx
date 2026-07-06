@@ -1,0 +1,121 @@
+---
+title: "Identity Verification"
+description: "Multi-frame biometric verification using ArcFace, Reducto OCR, and motion-based liveness detection"
+---
+
+The `vouch.identity` module manages the full KYC pipeline: document parsing, face extraction, biometric matching using the ArcFace neural network, and gesture-based liveness detection. Results are stored on the user's `PlatformUser` profile in the database.
+
+---
+
+## `vouch.identity.verify()`
+
+Performs a complete identity verification pass on a government-issued ID and a sequence of selfie frames.
+
+```typescript
+const result = await vouch.identity.verify(
+  documentFile,   // File | Blob — photo of government-issued ID
+  selfieFile,     // File | Blob — selfie image or array of frames
+  externalUserId  // string — your platform's user ID
+);
+
+if (result.data.identityVerified && result.data.livenessPassed) {
+  console.log(`Verified with ${result.data.identityMatchScore}% confidence`);
+} else {
+  console.log(`Rejected: ${result.data.rejectionReason}`);
+}
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `documentFile` | `File \| Blob` | Yes | Photo of passport, driver's license, or national ID card. Accepted: JPEG, PNG. Max: 5MB. |
+| `selfieFile` | `File \| Blob` | Yes | One or more live selfie frames. Supplying multiple frames activates the motion liveness check. |
+| `externalUserId` | `string` | Yes | Your platform's unique user ID. Vouch uses this to create or look up a `PlatformUser` record. |
+
+---
+
+## Verification Pipeline (In Order)
+
+### Step 1 — Image Quality Validation
+Each image is validated for brightness, contrast, and blur before processing. Images that are too dark, overexposed, or blurry are rejected early with `rejection_reason: 'document_unreadable'`.
+
+### Step 2 — Document Type Detection
+The document type is inferred from the image aspect ratio and, where available, text layout from Reducto:
+
+| Detected Type | Value |
+| :--- | :--- |
+| Passport | `"passport"` |
+| Driver's License | `"drivers_license"` |
+| National ID Card | `"national_id"` |
+| Unknown | `"unknown"` |
+
+### Step 3 — Reducto AI OCR
+Instead of standard Tesseract OCR, the pipeline uses **Reducto** for high-fidelity structured document parsing. Reducto preserves spatial layout and separates image regions from text blocks, enabling:
+- Extraction of the **face photo** region from document images (used directly for biometric matching)
+- Accurate field extraction: Name, Expiry Date, Issue Date, Document Number
+
+If Reducto is unavailable, the system falls back to `pytesseract` for text and `OpenCV Haar cascades` for face detection.
+
+### Step 4 — Face Extraction
+The face region is extracted from both the document and each selfie frame. The engine samples every 3rd selfie frame to balance accuracy with processing speed, reducing verification time from ~48s to ~18s without sacrificing reliability.
+
+### Step 5 — ArcFace Biometric Matching
+Faces are matched using **ArcFace**, a deep-learning biometric model with state-of-the-art accuracy. The model computes a cosine distance between face embeddings:
+
+| Score | Verdict | Match Confidence |
+| :---: | :---: | :--- |
+| **`≥ 90`** | `verified: true` | Strong — same person. |
+| **`50 – 89`** | `verified: false` | Uncertain — poor image quality or partial face. |
+| **`0 – 49`** | `verified: false` | Mismatch — different person or extraction failure. |
+
+> [!IMPORTANT]
+> The production match threshold is **90%** — stricter than ArcFace's default to prevent spoofing. Scores below 90 are auto-rejected.
+
+### Step 6 — Liveness Detection
+The liveness check combines two signals:
+
+1. **Face presence**: Reducto (or OpenCV cascade fallback) confirms a real face exists in the center frame.
+2. **Motion analysis**: OpenCV computes a pixel-level difference between the first and last selfie frames. A `motion_score > 2.0` is required to confirm real movement, protecting against photo-print and screen-replay attacks.
+
+Both signals must pass for `liveness_passed: true`.
+
+### Step 7 — Result Persistence
+Results are stored on the `PlatformUser` database record:
+- `identityVerified`, `identityMatchScore`, `livenessPassed`, `documentType`
+- `onboardingLocation` (derived from the user's IP at verification time)
+- `deviceFingerprintAtOnboarding`
+
+An audit log entry (`IDENTITY_VERIFIED` or `IDENTITY_FAILED`) is written to the developer log asynchronously.
+
+---
+
+## Rejection Reasons
+
+| `rejectionReason` | Description |
+| :--- | :--- |
+| `document_unreadable` | Image could not be decoded or is corrupt. |
+| `face_not_found` | No face detected in the document or selfie. |
+| `match_below_threshold` | Match score is below the 90% threshold. |
+| `liveness_failed` | Motion score or face presence check failed. |
+
+---
+
+## Return Type: `IdentityVerifyResult`
+
+```typescript
+interface IdentityVerifyResult {
+  status: "success" | "failed";
+  message: string;
+  data: {
+    id: string;                          // Vouch PlatformUser ID
+    externalUserId: string;              // Echoes your platform user ID
+    identityVerified: boolean;           // true only if score >= 90 AND liveness passed
+    identityMatchScore: number | null;   // 0–99 ArcFace match confidence
+    livenessPassed: boolean;             // true if both face presence and motion checks pass
+    documentType: string | null;         // "passport" | "drivers_license" | "national_id"
+    rejectionReason: string | null;      // set when identityVerified is false
+    processing_time_ms: number;          // total pipeline duration in milliseconds
+  };
+}
+```

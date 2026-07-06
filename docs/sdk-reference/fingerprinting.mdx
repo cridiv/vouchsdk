@@ -1,0 +1,55 @@
+---
+title: "Device Fingerprinting"
+description: "Automatic browser profiling for VPN detection, device mismatch, and impossible travel signals"
+---
+
+The Vouch SDK includes a built-in device fingerprinting module powered by `@fingerprintjs/fingerprintjs` v5. It runs silently in the background and injects a unique visitor ID into every API request automatically — no configuration required.
+
+---
+
+## What It Detects
+
+The fingerprint is used by the fraud scoring engine to flag:
+
+| Signal | Description |
+| :--- | :--- |
+| **`device_mismatch`** | The current browser fingerprint differs from the one recorded at onboarding, suggesting account takeover or shared credentials. |
+| **`new_device`** | The fingerprint has never been seen before for this user, indicating a first-time login on a new device. |
+| **Impossible Travel** | The fingerprint is combined with the IP geolocation to detect when the same user appears simultaneously in two distant locations. |
+
+---
+
+## How It Works
+
+1. On first call, FingerprintJS evaluates hundreds of browser signals: Canvas rendering output, WebGL driver fingerprints, system fonts, audio context, screen resolution, OS, installed plugins, and more.
+2. These signals are hashed into a stable `visitorId` string.
+3. The ID is cached in memory for the session (no repeated computation on subsequent calls).
+4. It is automatically injected as:
+   - `device_fingerprint` — in `vouch.identity.verify()` (form field)
+   - `deviceFingerprint` — in `vouch.fraud.assess()` (JSON body)
+   - `device_fingerprint` — in `vouch.escrow.assess()` (JSON body)
+
+The backend `DeviceService` then compares this fingerprint against the one stored at onboarding to compute `device_seen_before` and `device_matches_onboarding` signals for the ML engine.
+
+---
+
+## Runtime Behavior
+
+| Environment | Behavior |
+| :--- | :--- |
+| **Browser** | Runs FingerprintJS to generate a stable `visitorId`. Cached in memory. |
+| **Node.js (server-side)** | Returns the static string `'node-server-fingerprint'`. |
+| **Test / CI** | Set `globalThis.MOCK_FINGERPRINT = 'test-fp'` before calling any SDK method. |
+
+---
+
+## Manual Access
+
+You do not need to call this utility manually. However, if you need the visitor ID for your own audit pipeline:
+
+```typescript
+import { getDeviceFingerprint } from 'vouch-sdk';
+
+const visitorId = await getDeviceFingerprint();
+// → "a52c938b812f4d7c9..."
+```

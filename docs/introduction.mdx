@@ -1,0 +1,66 @@
+---
+title: "Introduction"
+description: "Welcome to the Vouch Trust Layer SDK documentation"
+---
+
+The **Vouch SDK** (`vouch-sdk`) is the official TypeScript/JavaScript client library for the Vouch Trust Platform. It provides a single, unified API surface that wraps three core trust infrastructure services:
+
+<CardGroup cols={3}>
+  <Card title="Identity Verification" icon="id-card" color="#6366f1" href="/sdk-reference/identity">
+    Multi-frame document OCR, biometric face matching, and gesture-based liveness verification.
+  </Card>
+  <Card title="Fraud Intelligence" icon="shield-halved" color="#a855f7" href="/sdk-reference/fraud">
+    Real-time transaction fraud scoring utilizing device fingerprinting, VPN detection, and rules engines.
+  </Card>
+  <Card title="Milestone Escrow" icon="handshake" color="#ec4899" href="/sdk-reference/escrow">
+    Binding agreement escrow management with automatic bank account routing and payout disbursement.
+  </Card>
+</CardGroup>
+
+---
+
+## SDK Architecture
+
+The SDK handles all network communication, file uploads, authentication headers, and client device fingerprint collection automatically, allowing you to interface with a clean, Promise-based API.
+
+```
+┌─────────────────────────────────────────────────────┐
+│                   Your Application                   │
+│          (Browser / Next.js / Node.js)               │
+└──────────────────────┬──────────────────────────────┘
+                       │  import Vouch from 'vouch-sdk'
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│                    Vouch SDK                         │
+│                                                     │
+│  ┌─────────────┐ ┌──────────┐ ┌──────────────────┐  │
+│  │  identity    │ │  fraud   │ │     escrow       │  │
+│  │  .verify()   │ │  .assess │ │ .create()        │  │
+│  │              │ │          │ │ .assess()        │  │
+│  │              │ │          │ │ .confirm()       │  │
+│  │              │ │          │ │ .status()        │  │
+│  └──────┬───────┘ └────┬─────┘ └───────┬──────────┘  │
+│         │              │               │             │
+│  ┌──────┴──────────────┴───────────────┴──────────┐  │
+│  │         Axios HTTP Client (x-api-key)          │  │
+│  └──────────────────────┬─────────────────────────┘  │
+│  ┌──────────────────────┴─────────────────────────┐  │
+│  │      FingerprintJS (automatic collection)      │  │
+│  └────────────────────────────────────────────────┘  │
+└──────────────────────┬──────────────────────────────┘
+                       │  HTTPS / x-api-key header
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│              Vouch Backend (NestJS)                   │
+│                  /v1/* endpoints                     │
+│                                                     │
+│  Identity ──► ML Engine (FastAPI/ArcFace)            │
+│  Fraud    ──► LightGBM + Rule Engine                 │
+│  Escrow   ──► Prisma DB + Nomba Payment Gateway      │
+└─────────────────────────────────────────────────────┘
+```
+
+### Key Technical Decisions:
+* **Isomorphic Build**: Compiles to standard ES Modules (ESM) that run seamlessly in modern browsers and Node.js server environments.
+* **Automatic Device Fingerprinting**: Silent collection of client browser parameters using FingerprintJS v5, attached automatically to requests to flag anomalies like VPNs or impossible travel.
+* **Axios Engine**: Requests route through an isolated, pre-configured HTTP client managing API key authentication (`x-api-key`) and payload formatting.
