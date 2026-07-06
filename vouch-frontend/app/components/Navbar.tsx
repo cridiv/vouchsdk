@@ -41,25 +41,26 @@ const Navbar = () => {
           </div>
 
           {/* Right: Docs, CTA & Mobile Toggle */}
-          <div className="flex items-center justify-end gap-5 text-gray-600 font-medium">
+          <div className="flex items-center justify-end gap-3 font-dm-sans">
             <Button
-              onClick={() => (window.location.href = "/signin")}
-              className="hover:text-black transition hidden lg:block"
-            >
-              Get started
-            </Button>
-            <Button
-              onClick={() => (window.location.href = "/github")}
-              className="hover:text-black transition hidden lg:block"
+              variant="ghost"
+              onClick={() => (window.location.href = "https://github.com/cridiv/vouchsdk")}
+              className="text-gray-300 hover:text-white hover:bg-white/10 transition hidden lg:inline-flex h-9 px-4 text-sm font-medium"
             >
               GitHub
             </Button>
             <Button
               variant="outline"
               onClick={() => (window.location.href = "/demos")}
-              className="bg-black text-white px-4 py-2 rounded-md transition hidden sm:block"
+              className="border-white/10 hover:border-white/30 bg-transparent text-white hover:bg-white/5 transition hidden sm:inline-flex h-9 px-4 text-sm font-medium"
             >
               View demo
+            </Button>
+            <Button
+              onClick={() => (window.location.href = "/signin")}
+              className="bg-white text-black hover:bg-gray-100 transition hidden lg:inline-flex h-9 px-4 text-sm font-semibold shadow-[0_0_15px_rgba(255,255,255,0.1)]"
+            >
+              Get started
             </Button>
 
             {/* Mobile Hamburger Toggle */}
