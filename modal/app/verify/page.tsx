@@ -33,7 +33,7 @@ function VerifyContent() {
       const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       setIsLocalhost(isLocal);
       if (!isLocal) {
-        setApiUrl('https://vouch-fmql.onrender.com/v1');
+        setApiUrl('https://vouchsdk.onrender.com/v1');
       }
     }
   }, []);

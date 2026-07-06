@@ -4,7 +4,7 @@ import axios from 'axios';
 @Injectable()
 export class NombaService {
   private readonly logger = new Logger(NombaService.name);
-  private readonly baseUrl = 'https://sandbox.nomba.com';
+  private readonly baseUrl = process.env.NOMBA_BASE_URL || 'https://api.nomba.com';
   private accessToken: string | null = null;
   private tokenExpiry: number = 0;
 

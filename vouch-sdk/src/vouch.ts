@@ -48,13 +48,17 @@ export interface CreateAgreementParams {
 
 export interface AgreementResponse {
   id: string;
+  agreementId?: string; // some endpoints return agreementId
   developerId: string;
   buyerExternalId: string;
   sellerExternalId: string;
   status: string;
-  squadVirtualAccountId?: string | null;
-  squadVirtualAccountNo?: string | null;
+  nombaVirtualAccountId?: string | null;
+  nombaVirtualAccountNo?: string | null;
+  nombaVirtualAccountRef?: string | null;
+  nombaBank?: string | null;
   totalAmount: number;
+  amountReceived?: number;
   currency: string;
   createdAt: string;
   milestones: {
@@ -64,6 +68,7 @@ export interface AgreementResponse {
     buyerConfirmed: boolean;
     sellerConfirmed: boolean;
     status: string;
+    disbursedAt?: string | null;
   }[];
 }
 
@@ -75,13 +80,15 @@ export interface AssessPaymentParams {
 }
 
 export interface AssessPaymentResponse {
+  status: string;
   score: number;
-  flag: string;
-  squadVirtualAccount?: {
-    accountNumber: string;
-    bankCode: string;
-    accountName: string;
-  };
+  flag: 'GREEN' | 'AMBER' | 'RED';
+  triggeredSignals?: string[];
+  nombaVirtualAccountId?: string | null;
+  nombaVirtualAccountNo?: string | null;
+  nombaBank?: string | null;
+  amount?: number;
+  message?: string;
 }
 
 export interface VouchOptions {
@@ -96,7 +103,7 @@ export class Vouch {
 
   constructor(apiKey: string, options: VouchOptions = {}) {
     this.apiKey = apiKey;
-    const baseURL = options.apiUrl || (typeof process !== 'undefined' && process.env?.VOUCH_API_URL) || 'https://vouch-fmql.onrender.com/v1';
+    const baseURL = options.apiUrl || (typeof process !== 'undefined' && process.env?.VOUCH_API_URL) || 'https://vouchsdk.onrender.com';
     this.verifyUrl = options.verifyUrl || 'https://vouch-modal.vercel.app';
 
     this.http = axios.create({
