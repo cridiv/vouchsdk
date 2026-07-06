@@ -7,7 +7,7 @@ import DocTypeSelector, { DocType } from '@/app/components/verify/DocTypeSelecto
 import DocumentUpload from '@/app/components/verify/DocumentUpload'
 import LivenessCapture from '@/app/components/verify/LivenessCapture'
 import VerificationResult from '@/app/components/verify/VerificationResult'
-import { Vouch } from '@/lib/vouch-sdk/vouch'
+import { Vouch } from 'vouch-sdk'
 
 type Step = 1 | 2 | 3 | 4
 
