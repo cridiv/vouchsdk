@@ -1,58 +1,140 @@
-import { open, Database } from 'sqlite';
+import fs from 'fs';
 import path from 'path';
 
-let dbConnection: Database | null = null;
+// Save the plica.json in Vercel's writable /tmp directory
+const DB_FILE = path.join('/tmp', 'plica.json');
 
-export async function getDb(): Promise<Database> {
+class JsonDatabase {
+  private data: {
+    users: any[];
+    gigs: any[];
+  } = { users: [], gigs: [] };
+
+  constructor() {
+    this.load();
+  }
+
+  private load() {
+    try {
+      if (fs.existsSync(DB_FILE)) {
+        this.data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+      } else {
+        this.data = { users: [], gigs: [] };
+      }
+    } catch (e) {
+      this.data = { users: [], gigs: [] };
+    }
+    // Ensure lists are initialized
+    this.data.users = this.data.users || [];
+    this.data.gigs = this.data.gigs || [];
+  }
+
+  private save() {
+    try {
+      fs.writeFileSync(DB_FILE, JSON.stringify(this.data, null, 2), 'utf8');
+    } catch (e) {
+      console.error('Failed to save json db:', e);
+    }
+  }
+
+  async exec(sql: string): Promise<void> {
+    return;
+  }
+
+  async get(sql: string, params: any[] = []): Promise<any> {
+    this.load();
+    const query = sql.toLowerCase();
+    
+    if (query.includes('select * from users where email = ?')) {
+      const email = params[0];
+      const user = this.data.users.find(u => u.email === email);
+      return user ? { ...user } : null;
+    }
+    
+    if (query.includes('select count(*) as count from gigs')) {
+      return { count: this.data.gigs.length };
+    }
+    
+    if (query.includes('select count(*) as count from users')) {
+      return { count: this.data.users.length };
+    }
+    
+    return null;
+  }
+
+  async all(sql: string, params: any[] = []): Promise<any[]> {
+    this.load();
+    const query = sql.toLowerCase();
+    
+    if (query.includes('from gigs')) {
+      if (query.includes('where freelancer_email = ?') || query.includes('freelancer_email = ?')) {
+        const email = params[0];
+        return this.data.gigs.filter(g => g.freelancerEmail === email || g.freelancer_email === email);
+      }
+      return [...this.data.gigs];
+    }
+    
+    return [];
+  }
+
+  async run(sql: string, params: any[] = []): Promise<void> {
+    this.load();
+    const query = sql.toLowerCase();
+    
+    if (query.includes('insert into users')) {
+      const [email, name, password, role, is_verified, created_at] = params;
+      this.data.users = this.data.users.filter(u => u.email !== email);
+      this.data.users.push({
+        email,
+        name,
+        password,
+        role,
+        is_verified: Number(is_verified),
+        created_at
+      });
+      this.save();
+    }
+    
+    else if (query.includes('insert into gigs')) {
+      const [id, name, service_type, description, price, preset_id, freelancer_email, freelancer_name, image_url, created_at] = params;
+      this.data.gigs = this.data.gigs.filter(g => g.id !== id);
+      this.data.gigs.push({
+        id,
+        name,
+        service_type,
+        serviceType: service_type,
+        description,
+        price: Number(price),
+        preset_id,
+        presetId: preset_id,
+        freelancer_email,
+        freelancerEmail: freelancer_email,
+        freelancer_name,
+        freelancerName: freelancer_name,
+        image_url,
+        imageUrl: image_url,
+        created_at
+      });
+      this.save();
+    }
+    
+    else if (query.includes('update users set is_verified = 1')) {
+      const email = params[0];
+      const user = this.data.users.find(u => u.email === email);
+      if (user) {
+        user.is_verified = 1;
+        this.save();
+      }
+    }
+  }
+}
+
+let dbConnection: any = null;
+
+export async function getDb(): Promise<any> {
   if (dbConnection) return dbConnection;
 
-  // Lazy-load sqlite3 to prevent native binary GLIBC execution errors during Vercel build-time inspection
-  const sqlite3 = require('sqlite3');
-
-  // Save the plica.db in the vouch-demo root directory
-  const dbPath = path.resolve(process.cwd(), 'plica.db');
-  
-  dbConnection = await open({
-    filename: dbPath,
-    driver: sqlite3.Database
-  });
-
-  // Enable foreign keys
-  await dbConnection.exec('PRAGMA foreign_keys = ON');
-
-  // Create tables
-  await dbConnection.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      email TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      password TEXT NOT NULL,
-      role TEXT NOT NULL,
-      is_verified INTEGER DEFAULT 0,
-      created_at TEXT NOT NULL
-    )
-  `);
-
-  await dbConnection.exec(`
-    CREATE TABLE IF NOT EXISTS gigs (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      service_type TEXT NOT NULL,
-      description TEXT NOT NULL,
-      price REAL NOT NULL,
-      preset_id TEXT NOT NULL,
-      freelancer_email TEXT NOT NULL,
-      freelancer_name TEXT NOT NULL,
-      image_url TEXT,
-      created_at TEXT NOT NULL
-    )
-  `);
-
-  // Ensure image_url column is added if table already existed from previous runs
-  try {
-    await dbConnection.exec('ALTER TABLE gigs ADD COLUMN image_url TEXT');
-  } catch (e) {
-    // Column already exists
-  }
+  dbConnection = new JsonDatabase();
 
   // Seed mock gigs if empty
   const gigCount = await dbConnection.get('SELECT COUNT(*) as count FROM gigs');
@@ -111,10 +193,10 @@ export async function getDb(): Promise<Database> {
       ]);
     }
     
-    console.log('✓ Mock gigs seeded in SQLite.');
+    console.log('✓ Mock gigs seeded in SQLite (JSON file mode).');
   }
 
-  // Seed mock users in users table so they can be logged in during tests
+  // Seed mock users if empty
   const userCount = await dbConnection.get('SELECT COUNT(*) as count FROM users');
   if (userCount.count === 0) {
     const mockUsers = [
@@ -137,13 +219,13 @@ export async function getDb(): Promise<Database> {
       ]);
     }
     
-    console.log('✓ Mock users seeded in SQLite.');
+    console.log('✓ Mock users seeded in SQLite (JSON file mode).');
   }
 
   // Sync verification statuses to Vouch backend asynchronously
   const mockEmails = ['jane.design@gmail.com', 'samuel.dev@gmail.com', 'sarah.write@gmail.com'];
   for (const email of mockEmails) {
-    fetch('http://localhost:5000/developer/mark-verified', {
+    fetch('https://vouchsdk.onrender.com/developer/mark-verified', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
