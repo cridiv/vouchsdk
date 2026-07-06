@@ -1,4 +1,3 @@
-import sqlite3 from 'sqlite3';
 import { open, Database } from 'sqlite';
 import path from 'path';
 
@@ -6,6 +5,9 @@ let dbConnection: Database | null = null;
 
 export async function getDb(): Promise<Database> {
   if (dbConnection) return dbConnection;
+
+  // Lazy-load sqlite3 to prevent native binary GLIBC execution errors during Vercel build-time inspection
+  const sqlite3 = require('sqlite3');
 
   // Save the plica.db in the vouch-demo root directory
   const dbPath = path.resolve(process.cwd(), 'plica.db');
