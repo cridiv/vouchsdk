@@ -9,6 +9,10 @@
             "destination": "https://cridiv.mintlify.app/_mintlify/api/request"
         },
         {
+            "source": "/mintlify-assets/:path*",
+            "destination": "https://cridiv.mintlify.app/mintlify-assets/:path*"
+        },
+        {
             "source": "/docs",
             "destination": "https://cridiv.mintlify.app/docs"
         },
