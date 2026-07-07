@@ -94,3 +94,8 @@ async def shutdown_event():
     logger.info("=" * 60)
     logger.info("ML Service shutting down...")
     logger.info("=" * 60)
+
+@app.get("/healthz")
+def keep_awake():
+    return {"status": "alive"}
+    
