@@ -104,7 +104,7 @@ export class Vouch {
   constructor(apiKey: string, options: VouchOptions = {}) {
     this.apiKey = apiKey;
     const baseURL = options.apiUrl || (typeof process !== 'undefined' && process.env?.VOUCH_API_URL) || 'https://vouchsdk.onrender.com';
-    this.verifyUrl = options.verifyUrl || 'https://vouch-modal.vercel.app';
+    this.verifyUrl = options.verifyUrl || 'https://vouchsdk-modal.vercel.app';
 
     this.http = axios.create({
       baseURL,
