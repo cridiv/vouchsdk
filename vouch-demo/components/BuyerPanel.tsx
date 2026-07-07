@@ -27,7 +27,7 @@ async function generateHmac(body: string, secret: string): Promise<string> {
 }
 
 interface BuyerPanelProps {
-  currentUser: { email: string; name: string; role: string };
+  currentUser: { email: string; name: string; role: string; isVerified?: boolean };
   activeTab: 'dashboard' | 'marketplace' | 'my-gigs' | 'settings';
   setActiveTab: (tab: 'dashboard' | 'marketplace' | 'my-gigs' | 'settings') => void;
 }
@@ -110,6 +110,12 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
     e.preventDefault();
     setError(null);
     setSubmitting(true);
+
+    if (!currentUser.isVerified) {
+      setError('❌ Identity verification required! Please go to Settings and complete your Vouch biometric face scan before creating escrow agreements.');
+      setSubmitting(false);
+      return;
+    }
 
     if (!title || !freelancerEmail || !amount) {
       setError('Please fill in all project fields.');
@@ -271,6 +277,11 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
   };
 
   const handleOrderGig = (gig: any) => {
+    if (!currentUser.isVerified) {
+      alert('❌ Identity Verification Required:\nYou must complete biometric verification using your device camera before hiring freelancers or funding escrow. Please go to Settings to verify.');
+      return;
+    }
+
     // 1. Populate states
     setTitle(`Hire for: ${gig.name}`);
     setFreelancerEmail(gig.freelancerEmail);
