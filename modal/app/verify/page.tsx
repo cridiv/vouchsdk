@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import StepIndicator from '@/app/components/verify/StepIndicator'
 import DocTypeSelector, { DocType } from '@/app/components/verify/DocTypeSelector'
 import DocumentUpload from '@/app/components/verify/DocumentUpload'
@@ -144,9 +145,14 @@ function VerifyContent() {
     <div className={`page ${mode === 'modal' ? 'modal-mode' : ''}`}>
       <div className="card">
         {/* Logo */}
-        <div className="logo">
-          <div className="logo-mark">V</div>
-          <span className="logo-text">Vouch</span>
+        <div className="flex items-center gap-4 justify-start mb-6">
+          <Link
+            href="/"
+            className="font-bold text-xl tracking-tight text-gray-900 z-50"
+          >
+            {`{`} vouch{` }`}
+            <span className="text-[#58a0b4] text-3xl">.</span>sdk
+          </Link>
         </div>
 
         <StepIndicator current={step} />
