@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 class LoadTester:
     """Load tests ML service endpoints"""
     
-    def __init__(self, base_url: str = "http://localhost:5000"):
-        self.base_url = base_url
+    def __init__(self, base_url: str = None):
+        self.base_url = base_url or os.environ.get("VOUCH_API_URL", "https://vouchsdk.onrender.com")
         self.results = {
             "fraud_assess_concurrent": [],
             "fraud_assess_sequential": [],

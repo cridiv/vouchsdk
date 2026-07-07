@@ -51,7 +51,7 @@ const Navbar = () => {
             </Button>
             <Button
               variant="outline"
-              onClick={() => (window.location.href = "/demos")}
+              onClick={() => (window.location.href = "https://vouchsdk-demo.vercel.app")}
               className="border-white/10 hover:border-white/30 bg-transparent text-white hover:bg-white/5 transition hidden sm:inline-flex h-9 px-4 text-sm font-medium"
             >
               View demo
@@ -140,7 +140,7 @@ const Navbar = () => {
             <Button
               variant="outline"
               onClick={() => {
-                window.location.href = "/demos";
+                window.location.href = "https://vouchsdk-demo.vercel.app";
                 toggleMenu();
               }}
               className="bg-black text-white py-6 text-lg w-64 "

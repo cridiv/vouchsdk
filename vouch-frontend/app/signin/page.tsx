@@ -38,8 +38,8 @@ const SignInPage = () => {
       setErrorMsg(null);
 
       const endpoint = isSignUp
-        ? "http://localhost:5000/developer/signup"
-        : "http://localhost:5000/developer/login";
+        ? "https://vouchsdk.onrender.com/developer/signup"
+        : "https://vouchsdk.onrender.com/developer/login";
 
       const body = isSignUp
         ? { email, password, name }

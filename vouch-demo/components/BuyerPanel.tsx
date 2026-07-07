@@ -65,7 +65,7 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
     try {
       const fetchPromises = localIds.map(async (id) => {
         try {
-          const res = await fetch(`http://localhost:5000/escrow/agreements/${id}`, {
+          const res = await fetch(`https://vouchsdk.onrender.com/escrow/agreements/${id}`, {
             method: 'GET',
             headers: {
               'x-api-key': VOUCH_API_KEY,
@@ -125,7 +125,7 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
     }
 
     try {
-      const res = await fetch('http://localhost:5000/escrow/agreements', {
+      const res = await fetch('https://vouchsdk.onrender.com/escrow/agreements', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -188,7 +188,7 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
     // path end-to-end. Falls back to localhost for offline use.
     const webhookBase =
       process.env.NEXT_PUBLIC_NOMBA_WEBHOOK_URL?.replace(/\/$/, '') ||
-      'http://localhost:5000';
+      'https://vouchsdk.onrender.com';
     const webhookUrl = `${webhookBase}/escrow/webhooks/nomba`;
     
     try {
@@ -219,7 +219,7 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
 
     setReleasingIds(prev => ({ ...prev, [agreementId]: true }));
     try {
-      const res = await fetch(`http://localhost:5000/escrow/agreements/${agreementId}/milestones/${milestoneId}/confirm`, {
+      const res = await fetch(`https://vouchsdk.onrender.com/escrow/agreements/${agreementId}/milestones/${milestoneId}/confirm`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -249,7 +249,7 @@ export const BuyerPanel: React.FC<BuyerPanelProps> = ({ currentUser, activeTab, 
     if (!confirm(`Are you sure you want to reclaim your excess payment of ₦${excess.toLocaleString()} back from escrow?`)) return;
 
     try {
-      const res = await fetch(`http://localhost:5000/escrow/agreements/${agreementId}/refund`, {
+      const res = await fetch(`https://vouchsdk.onrender.com/escrow/agreements/${agreementId}/refund`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

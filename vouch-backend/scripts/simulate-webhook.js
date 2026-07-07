@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 
 // 1. Configuration
-const url = 'http://localhost:5000/escrow/webhooks/nomba';
+const url = process.env.VOUCH_WEBHOOK_URL || 'https://vouchsdk.onrender.com/escrow/webhooks/nomba';
 const secret = process.env.NOMBA_WEBHOOK_SECRET || 'NombaHackathon2026';
 
 // 2. Parse arguments

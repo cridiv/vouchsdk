@@ -1,7 +1,7 @@
 import requests
 import os
 
-url = "http://localhost:8080/identity/verify"
+url = os.environ.get("AI_ENGINE_URL", "https://vouch-2uoc.onrender.com/identity/verify")
 
 document_path = "dummy.jpg"
 selfie_path = "dummy.jpg"

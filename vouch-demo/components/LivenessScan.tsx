@@ -67,7 +67,7 @@ export const LivenessScan: React.FC<LivenessScanProps> = ({
     const timer = setTimeout(async () => {
       try {
         // Send a call to our Vouch backend mark-verified dev endpoint to register the user as verified
-        const res = await fetch('http://localhost:5000/developer/mark-verified', {
+        const res = await fetch('https://vouchsdk.onrender.com/developer/mark-verified', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

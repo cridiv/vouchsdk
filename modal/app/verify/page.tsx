@@ -25,7 +25,7 @@ function VerifyContent() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<any>(null)
 
-  const [apiUrl, setApiUrl] = useState('http://localhost:5000');
+  const [apiUrl, setApiUrl] = useState('https://vouchsdk.onrender.com');
   const [isLocalhost, setIsLocalhost] = useState(false);
 
   useEffect(() => {

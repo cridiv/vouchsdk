@@ -5,8 +5,8 @@ import { Vouch } from 'vouch-sdk';
 import Image from 'next/image';
 
 const vouch = new Vouch(process.env.NEXT_PUBLIC_VOUCH_API_KEY || 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845', {
-  apiUrl: 'http://localhost:5000',
-  verifyUrl: 'http://localhost:3001',
+  apiUrl: 'https://vouchsdk.onrender.com',
+  verifyUrl: 'https://vouch-modal.vercel.app',
 });
 
 export default function AuthPage() {

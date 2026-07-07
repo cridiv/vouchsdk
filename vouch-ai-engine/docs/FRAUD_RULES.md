@@ -118,7 +118,7 @@ To make it more lenient:
 Use `samples/fraud_request_vpn.json` as the baseline test case:
 
 ```bash
-curl -X POST http://localhost:5000/fraud/assess \
+curl -X POST https://vouchsdk.onrender.com/fraud/assess \
   -H "Content-Type: application/json" \
   -d @samples/fraud_request_vpn.json
 ```

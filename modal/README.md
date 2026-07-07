@@ -1,3 +1,7 @@
+# Vouch KYC Modal Wrapper
+This is the hosted identity verification modal loaded via iframe by the Vouch SDK.
+* **Production URL:** [https://vouch-modal.vercel.app](https://vouch-modal.vercel.app)
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started

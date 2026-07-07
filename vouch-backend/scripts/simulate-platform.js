@@ -2,7 +2,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 
 // Configuration
-const BASE_URL = 'http://localhost:5000';
+const BASE_URL = process.env.VOUCH_API_URL || 'https://vouchsdk.onrender.com';
 const API_KEY = 'vouch_e62a93d67ead621439fcb0569e920c8e6988c7b533dc2845';
 const WEBHOOK_SECRET = 'NombaHackathon2026';
 

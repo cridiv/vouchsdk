@@ -65,7 +65,7 @@ export const FreelancerPanel: React.FC<FreelancerPanelProps> = ({ currentUser, a
       // This works regardless of localStorage state — critical for freelancers who
       // log in on a fresh session and have no localStorage agreement keys.
       const res = await fetch(
-        `http://localhost:5000/escrow/agreements?externalUserId=${encodeURIComponent(currentUser.email)}&role=seller`,
+        `https://vouchsdk.onrender.com/escrow/agreements?externalUserId=${encodeURIComponent(currentUser.email)}&role=seller`,
         {
           method: 'GET',
           headers: {

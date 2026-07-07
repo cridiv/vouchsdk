@@ -24,7 +24,7 @@ const GithubIcon = () => {
 
 const links = [
   { name: "Documentation", icon: BookOpen, href: "/docs" },
-  { name: "Demo Lab", icon: Blocks, href: "/demo" },
+  { name: "Demo Lab", icon: Blocks, href: "https://vouchsdk-demo.vercel.app" },
   { name: "System Status", icon: Activity, href: "#" },
   {
     name: "Source Code",

@@ -46,10 +46,10 @@ const DashboardPage = () => {
   const fetchStatsAndLogs = async (apiKey: string) => {
     try {
       const [statsRes, logsRes] = await Promise.all([
-        fetch("http://localhost:5000/developer/stats", {
+        fetch("https://vouchsdk.onrender.com/developer/stats", {
           headers: { "x-api-key": apiKey }
         }),
-        fetch("http://localhost:5000/developer/logs?limit=15", {
+        fetch("https://vouchsdk.onrender.com/developer/logs?limit=15", {
           headers: { "x-api-key": apiKey }
         })
       ]);

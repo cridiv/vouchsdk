@@ -23,7 +23,7 @@ export const StatementModal: React.FC<StatementModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`http://localhost:5000/escrow/agreements/${agreementId}/statement`, {
+      const res = await fetch(`https://vouchsdk.onrender.com/escrow/agreements/${agreementId}/statement`, {
         method: 'GET',
         headers: {
           'x-api-key': VOUCH_API_KEY,
